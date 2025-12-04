@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบลงเวลาฝึกงาน AI</title>
+  <title>ระบบลงเวลาฝึกงาน AI Pro</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- ใช้ face-api เวอร์ชันเดียวกับตัวอย่าง scan2 ที่เสถียร -->
   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
 
@@ -24,17 +23,18 @@
 </head>
 <body class="bg-slate-100 text-slate-800">
 
-  <!-- URL INPUT MODAL (จะแสดงครั้งแรกถ้าระบบหา URL ไม่เจอ) -->
+  <!-- URL MODAL -->
   <div id="url-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] hidden">
       <div class="bg-white p-8 rounded-xl w-full max-w-lg shadow-2xl text-center">
           <h2 class="text-2xl font-bold text-blue-900 mb-4">เชื่อมต่อระบบ</h2>
-          <p class="text-gray-600 mb-4">กรุณานำ <b>Web App URL</b> (ที่ได้จากการ Deploy) มาวางที่นี่เพื่อเริ่มต้นใช้งาน</p>
-          <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." class="w-full p-3 border-2 border-blue-200 rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 outline-none">
+          <p class="text-gray-600 mb-4">นำ Web App URL มาใส่ที่นี่เพื่อเริ่มต้น</p>
+          <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." class="w-full p-3 border rounded-lg mb-4">
           <button onclick="saveUrl()" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 w-full font-bold">บันทึกและเริ่มใช้งาน</button>
       </div>
   </div>
 
   <div class="flex h-screen overflow-hidden">
+    <!-- SIDEBAR -->
     <aside class="w-64 bg-slate-900 text-white hidden md:flex flex-col shadow-xl">
       <div class="p-6 flex items-center gap-3 border-b border-slate-700">
         <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-900 font-bold text-xl"><i class="fa-solid fa-school"></i></div>
@@ -42,13 +42,12 @@
       </div>
       <nav class="flex-1 p-4 space-y-2">
         <a onclick="showPage('home')" id="nav-home" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 sidebar-active"><i class="fa-solid fa-camera"></i> ลงเวลา</a>
-        <a onclick="showPage('stats')" id="nav-stats" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-chart-bar"></i> สถิติ</a>
         <div id="admin-menu" class="hidden">
             <div class="pt-4 pb-2 text-xs text-slate-500 uppercase font-semibold">ผู้ดูแลระบบ</div>
-            <a onclick="showPage('dashboard')" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-chart-pie"></i> แดชบอร์ด</a>
-            <a onclick="showPage('users')" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-users"></i> นักเรียน</a>
-            <a onclick="showPage('history')" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติ</a>
-            <a onclick="showPage('notify')" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-bullhorn"></i> ประกาศ</a>
+            <a onclick="showPage('dashboard')" id="nav-dashboard" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-chart-pie"></i> แดชบอร์ด</a>
+            <a onclick="showPage('users')" id="nav-users" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-users"></i> ข้อมูลนักเรียน</a>
+            <a onclick="showPage('history')" id="nav-history" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติลงเวลา</a>
+            <a onclick="showPage('notify')" id="nav-notify" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-bullhorn"></i> แจ้งประกาศ</a>
         </div>
       </nav>
       <div class="p-4 border-t border-slate-700">
@@ -58,19 +57,17 @@
       </div>
     </aside>
 
+    <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-slate-50 relative">
-        <!-- Loading Overlay -->
         <div id="loading" class="hidden fixed inset-0 bg-black/80 flex-col items-center justify-center z-50">
-            <div class="loader mb-4"></div>
-            <p id="loading-text" class="text-white">กำลังประมวลผล...</p>
+            <div class="loader mb-4"></div><p id="loading-text" class="text-white">กำลังประมวลผล...</p>
         </div>
 
-        <!-- CONTENT: HOME -->
+        <!-- 1. HOME: SCANNER -->
         <div id="page-home" class="page-section p-6 max-w-4xl mx-auto w-full">
             <div class="bg-white rounded-2xl shadow-xl p-6 text-center border-t-8 border-blue-600">
                 <h2 class="text-2xl font-bold mb-2">ลงเวลาด้วยใบหน้า</h2>
                 <p id="ai-status" class="text-slate-500 mb-6">กำลังเตรียมระบบ AI...</p>
-                
                 <div class="relative w-full max-w-lg mx-auto aspect-video bg-black rounded-xl overflow-hidden shadow-inner mb-6">
                     <video id="video" autoplay muted playsinline></video>
                     <canvas id="overlay"></canvas>
@@ -78,131 +75,175 @@
                         <i class="fa-solid fa-camera fa-3x mb-4"></i><p>กด "เริ่มสแกน"</p>
                     </div>
                 </div>
-
                 <div class="flex justify-center gap-4">
-                    <button id="btn-start" onclick="startCamera()" class="px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 shadow-lg disabled:bg-gray-400" disabled>
-                        <i class="fa-solid fa-play"></i> เริ่มสแกน
-                    </button>
-                    <button id="btn-stop" onclick="stopCamera()" class="hidden px-8 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg">
-                        <i class="fa-solid fa-stop"></i> หยุด
-                    </button>
+                    <button id="btn-start" onclick="startCamera()" class="px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 shadow-lg disabled:bg-gray-400" disabled><i class="fa-solid fa-play"></i> เริ่มสแกน</button>
+                    <button id="btn-stop" onclick="stopCamera()" class="hidden px-8 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg"><i class="fa-solid fa-stop"></i> หยุด</button>
                 </div>
             </div>
         </div>
 
-        <!-- CONTENT: USERS (ADMIN) -->
-        <div id="page-users" class="page-section p-6 hidden w-full">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold">จัดการนักเรียน</h2>
-                <button onclick="document.getElementById('modal-user').classList.remove('hidden')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"><i class="fa-solid fa-plus"></i> เพิ่ม</button>
+        <!-- 2. ADMIN DASHBOARD (กู้คืนแล้ว) -->
+        <div id="page-dashboard" class="page-section p-6 hidden w-full">
+            <h2 class="text-2xl font-bold mb-6 text-blue-800 border-l-4 border-blue-600 pl-3">ภาพรวมระบบ (Dashboard)</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-blue-500">
+                    <p class="text-xs text-slate-500">นักเรียนทั้งหมด</p>
+                    <h3 id="adm-total" class="text-3xl font-bold text-blue-700">0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-green-500">
+                    <p class="text-xs text-slate-500">มาวันนี้</p>
+                    <h3 id="adm-present" class="text-3xl font-bold text-green-700">0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-yellow-500">
+                    <p class="text-xs text-slate-500">มาสาย</p>
+                    <h3 id="adm-late" class="text-3xl font-bold text-yellow-700">0</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-red-500">
+                    <p class="text-xs text-slate-500">ขาด/ยังไม่มา</p>
+                    <h3 id="adm-absent" class="text-3xl font-bold text-red-700">0</h3>
+                </div>
             </div>
-            <div class="bg-white rounded-xl shadow overflow-x-auto">
-                <table class="w-full text-left"><tbody id="table-users"></tbody></table>
+            <div class="bg-white p-6 rounded-xl shadow-sm max-w-2xl mx-auto">
+                <h4 class="font-bold mb-4 text-center">สถิติการเข้างานวันนี้</h4>
+                <canvas id="adminChart"></canvas>
             </div>
         </div>
 
-        <!-- CONTENT: HISTORY (ADMIN) -->
+        <!-- 3. ADMIN USERS (Manage & Edit) -->
+        <div id="page-users" class="page-section p-6 hidden w-full">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold border-l-4 border-blue-600 pl-3">จัดการข้อมูลนักเรียน</h2>
+                <button onclick="openUserModal('add')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow"><i class="fa-solid fa-plus"></i> เพิ่มนักเรียน</button>
+            </div>
+            <div class="bg-white rounded-xl shadow overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 border-b">
+                        <tr>
+                            <th class="p-4">รูป</th>
+                            <th class="p-4">รหัส</th>
+                            <th class="p-4">ชื่อ-สกุล</th>
+                            <th class="p-4">สาขา</th>
+                            <th class="p-4 text-center">จัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-users" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 4. ADMIN HISTORY -->
         <div id="page-history" class="page-section p-6 hidden w-full">
-             <h2 class="text-2xl font-bold mb-4">ประวัติการลงเวลา</h2>
+             <div class="flex justify-between items-center mb-6">
+                 <h2 class="text-2xl font-bold border-l-4 border-blue-600 pl-3">ประวัติการลงเวลา</h2>
+                 <button onclick="loadHistory()" class="bg-slate-200 p-2 rounded hover:bg-slate-300"><i class="fa-solid fa-rotate"></i> รีเฟรช</button>
+             </div>
              <div class="bg-white rounded-xl shadow overflow-x-auto p-4">
-                 <table class="w-full text-sm"><thead class="bg-slate-100"><tr><th class="p-3">เวลา</th><th class="p-3">ชื่อ</th><th class="p-3">สถานะ</th><th class="p-3">หลักฐาน</th></tr></thead><tbody id="table-history"></tbody></table>
+                 <table class="w-full text-sm">
+                     <thead class="bg-slate-100"><tr><th class="p-3">เวลา</th><th class="p-3">ชื่อ</th><th class="p-3">สาขา</th><th class="p-3">สถานะ</th><th class="p-3">หลักฐาน</th></tr></thead>
+                     <tbody id="table-history"></tbody>
+                 </table>
              </div>
         </div>
 
-        <!-- Placeholder for other pages -->
-        <div id="page-dashboard" class="page-section p-6 hidden"><h2 class="text-2xl font-bold">Dashboard</h2><p>กำลังโหลด...</p></div>
-        <div id="page-stats" class="page-section p-6 hidden"><h2 class="text-2xl font-bold">สถิติของฉัน</h2><p>แสดงข้อมูลส่วนตัว...</p></div>
-        <div id="page-notify" class="page-section p-6 hidden"><h2 class="text-2xl font-bold">ส่งประกาศ</h2><p>ฟอร์มส่งอีเมล...</p></div>
+        <!-- 5. ADMIN NOTIFY -->
+        <div id="page-notify" class="page-section p-6 hidden w-full">
+            <h2 class="text-2xl font-bold mb-6 border-l-4 border-blue-600 pl-3">ส่งประกาศ (Email)</h2>
+            <div class="bg-white p-6 rounded-xl shadow max-w-2xl mx-auto">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold mb-1">ส่งถึงสาขา</label>
+                        <select id="notify-branch" class="w-full p-2 border rounded-lg bg-white"><option value="all">ทั้งหมด</option></select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-1">หัวข้อประกาศ</label>
+                        <input type="text" id="notify-subject" placeholder="ระบุหัวข้อ..." class="w-full p-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold mb-1">รายละเอียด</label>
+                        <textarea id="notify-msg" rows="5" placeholder="พิมพ์ข้อความ..." class="w-full p-2 border rounded-lg"></textarea>
+                    </div>
+                    <button onclick="sendNotify()" class="bg-green-600 text-white w-full py-3 rounded-lg hover:bg-green-700 font-bold shadow"><i class="fa-solid fa-paper-plane"></i> ส่งประกาศ</button>
+                </div>
+            </div>
+        </div>
 
     </main>
   </div>
 
-  <!-- ADD USER MODAL -->
-  <div id="modal-user" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div class="bg-white p-6 rounded-xl w-full max-w-md">
-          <h3 class="font-bold text-lg mb-4">เพิ่มนักเรียน</h3>
+  <!-- USER MODAL (Add & Edit) -->
+  <div id="modal-user" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
+      <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
+          <h3 class="font-bold text-xl mb-4 text-blue-900" id="modal-title">เพิ่มนักเรียน</h3>
           <form id="form-user" class="space-y-3">
-              <input id="u-id" placeholder="รหัส" class="w-full border p-2 rounded" required>
-              <input id="u-name" placeholder="ชื่อ-สกุล" class="w-full border p-2 rounded" required>
-              <input id="u-branch" placeholder="สาขา" class="w-full border p-2 rounded" required>
-              <input id="u-email" placeholder="อีเมล" class="w-full border p-2 rounded">
-              <div class="border-2 border-dashed p-4 text-center cursor-pointer" onclick="document.getElementById('u-file').click()">
-                  <span id="f-name">เลือกรูปภาพ</span>
+              <input type="hidden" id="u-mode" value="add"> <!-- add or update -->
+              <input type="hidden" id="u-old-id"> <!-- for update ref -->
+              
+              <div><label class="text-xs font-bold">รหัส</label><input id="u-id" class="w-full border p-2 rounded" required></div>
+              <div><label class="text-xs font-bold">ชื่อ-สกุล</label><input id="u-name" class="w-full border p-2 rounded" required></div>
+              <div><label class="text-xs font-bold">สาขา</label><input id="u-branch" class="w-full border p-2 rounded" required></div>
+              <div><label class="text-xs font-bold">อีเมล</label><input id="u-email" type="email" class="w-full border p-2 rounded"></div>
+              
+              <div class="border-2 border-dashed p-4 text-center cursor-pointer hover:bg-gray-50 transition" onclick="document.getElementById('u-file').click()">
+                  <i class="fa-solid fa-image text-gray-400 mb-1"></i><br>
+                  <span id="f-name" class="text-sm text-gray-500">คลิกเพื่ออัปโหลดรูป (สำหรับ AI)</span>
                   <input type="file" id="u-file" class="hidden" accept="image/*">
                   <input type="hidden" id="u-base64">
               </div>
-              <div class="flex justify-end gap-2 mt-4">
-                  <button type="button" onclick="document.getElementById('modal-user').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded">ยกเลิก</button>
-                  <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">บันทึก</button>
+              
+              <div class="flex justify-end gap-2 mt-6">
+                  <button type="button" onclick="document.getElementById('modal-user').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">ยกเลิก</button>
+                  <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">บันทึก</button>
               </div>
           </form>
       </div>
   </div>
 
   <script>
-    // --- CORE CONFIG ---
+    // --- CORE ---
     let API_URL = localStorage.getItem('GAS_API_URL') || '';
     let isAdmin = false;
     let students = [];
     let faceMatcher = null;
     let stream = null;
 
-    // --- STARTUP ---
-    window.onload = async () => {
-        if(!API_URL) {
-            document.getElementById('url-modal').classList.remove('hidden');
-        } else {
-            initApp();
-        }
+    window.onload = () => {
+        if(!API_URL) document.getElementById('url-modal').classList.remove('hidden');
+        else initApp();
     };
 
     function saveUrl() {
         const url = document.getElementById('gas-url-input').value.trim();
-        if(url) {
-            localStorage.setItem('GAS_API_URL', url);
-            API_URL = url;
-            document.getElementById('url-modal').classList.add('hidden');
-            initApp();
-        }
+        if(url) { localStorage.setItem('GAS_API_URL', url); API_URL = url; document.getElementById('url-modal').classList.add('hidden'); initApp(); }
     }
-    
-    function resetUrl() {
-        localStorage.removeItem('GAS_API_URL');
-        location.reload();
-    }
+    function resetUrl() { localStorage.removeItem('GAS_API_URL'); location.reload(); }
 
     async function initApp() {
-        showLoading(true, "กำลังโหลดข้อมูล...");
-        // 1. Load Data
+        showLoading(true, "กำลังเชื่อมต่อระบบ...");
         const res = await apiCall('getInitialData');
         if(res.success) {
             students = res.students;
             renderUsers();
+            populateNotifyBranch(res.branches || []);
+        } else {
+            Swal.fire('Connection Failed', 'ตรวจสอบ URL หรือลองใหม่', 'error');
         }
-        // 2. Load AI
         await loadAI();
         showLoading(false);
     }
 
-    // --- API HANDLER (หัวใจสำคัญ: ใช้ fetch แทน google.script.run) ---
     async function apiCall(action, data = {}) {
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
-                // ลบ mode: 'no-cors' ออก เพื่อให้สามารถอ่าน Response JSON ได้
                 redirect: "follow",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify({ action, data })
             });
             return await response.json();
-        } catch (e) {
-            console.error(e);
-            // กรณี no-cors อาจ return null แต่ถ้า Web App Deploy ถูกต้อง จะ return JSON
-            return { success: false, message: "Connection Error (Check URL/CORS)" };
-        }
+        } catch (e) { return { success: false, message: "Connection Error" }; }
     }
 
-    // --- AI LOGIC ---
+    // --- AI ---
     async function loadAI() {
         const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
         try {
@@ -214,7 +255,6 @@
             document.getElementById('ai-status').innerText = "AI พร้อมใช้งาน";
             document.getElementById('btn-start').disabled = false;
             
-            // Build Matcher
             if(students.length > 0) {
                 const labeled = await Promise.all(students.map(async s => {
                     if(!s.PhotoUrl) return null;
@@ -227,167 +267,220 @@
                 const valid = labeled.filter(d => d);
                 if(valid.length) faceMatcher = new faceapi.FaceMatcher(valid, 0.6);
             }
-        } catch(e) { document.getElementById('ai-status').innerText = "AI Error"; }
+        } catch(e) { document.getElementById('ai-status').innerText = "AI Error (Refresh Page)"; }
     }
 
     async function startCamera() {
         document.getElementById('cam-placeholder').classList.add('hidden');
         document.getElementById('btn-start').classList.add('hidden');
         document.getElementById('btn-stop').classList.remove('hidden');
-        
         stream = await navigator.mediaDevices.getUserMedia({ video: {} });
         const video = document.getElementById('video');
         video.srcObject = stream;
-        
         video.addEventListener('play', () => {
             const canvas = document.getElementById('overlay');
             const dim = { width: video.videoWidth, height: video.videoHeight };
             faceapi.matchDimensions(canvas, dim);
-            
             const loop = setInterval(async () => {
                 if(!stream) return clearInterval(loop);
-                const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
-                const resized = faceapi.resizeResults(detections, dim);
+                const dets = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+                const re = faceapi.resizeResults(dets, dim);
                 canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
-                
-                if(faceMatcher && resized.length > 0) {
-                    const best = faceMatcher.findBestMatch(resized[0].descriptor);
-                    new faceapi.draw.DrawBox(resized[0].detection.box, { label: best.toString() }).draw(canvas);
-                    
-                    if(best.label !== 'unknown') {
-                        clearInterval(loop);
-                        handleMatch(best.label, video);
-                    }
+                if(faceMatcher && re.length > 0) {
+                    const best = faceMatcher.findBestMatch(re[0].descriptor);
+                    new faceapi.draw.DrawBox(re[0].detection.box, { label: best.toString() }).draw(canvas);
+                    if(best.label !== 'unknown') { clearInterval(loop); handleMatch(best.label, video); }
                 }
             }, 500);
         });
     }
-
-    function stopCamera() {
-        if(stream) stream.getTracks().forEach(t=>t.stop());
-        stream = null;
-        document.getElementById('cam-placeholder').classList.remove('hidden');
-        document.getElementById('btn-start').classList.remove('hidden');
-        document.getElementById('btn-stop').classList.add('hidden');
-    }
-
+    function stopCamera() { if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; document.getElementById('cam-placeholder').classList.remove('hidden'); document.getElementById('btn-start').classList.remove('hidden'); document.getElementById('btn-stop').classList.add('hidden'); }
+    
     async function handleMatch(id, video) {
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth; canvas.height = video.videoHeight;
         canvas.getContext('2d').drawImage(video, 0, 0);
         const img = canvas.toDataURL('image/jpeg');
         stopCamera();
-        
         showLoading(true, "กำลังบันทึกเวลา...");
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const res = await apiCall('processCheckIn', {
-                studentId: id, lat: pos.coords.latitude, lng: pos.coords.longitude, image: img
-            });
+            const res = await apiCall('processCheckIn', { studentId: id, lat: pos.coords.latitude, lng: pos.coords.longitude, image: img });
             showLoading(false);
             Swal.fire(res.success?'สำเร็จ':'ผิดพลาด', res.message, res.success?'success':'error');
-        }, () => {
-            showLoading(false); Swal.fire('Error', 'กรุณาเปิด GPS', 'error');
-        });
+        }, () => { showLoading(false); Swal.fire('Error', 'กรุณาเปิด GPS', 'error'); });
     }
 
-    // --- ADMIN & UI ---
+    // --- ADMIN UI ---
     function showPage(id) {
         document.querySelectorAll('.page-section').forEach(p => p.classList.add('hidden'));
+        document.querySelectorAll('nav a').forEach(a => a.classList.remove('sidebar-active', 'bg-slate-800')); // Clear active
         document.getElementById('page-'+id).classList.remove('hidden');
-        if(id === 'history') loadHistory();
+        document.getElementById('nav-'+id).classList.add('sidebar-active'); // Set active
+        if(id === 'dashboard' && isAdmin) loadDashboard();
+        if(id === 'history' && isAdmin) loadHistory();
     }
 
     function adminLogin() {
-        Swal.fire({ title: 'Admin Login', html: '<input id="swal-p" type="password" class="swal2-input">', preConfirm: () => document.getElementById('swal-p').value })
+        Swal.fire({ title: 'Admin Login', html: '<input id="swal-p" type="password" class="swal2-input" placeholder="Password">', preConfirm: () => document.getElementById('swal-p').value })
         .then(r => {
             if(r.value === '1234') {
                 isAdmin = true;
                 document.getElementById('admin-menu').classList.remove('hidden');
                 document.getElementById('btn-login').classList.add('hidden');
                 document.getElementById('btn-logout').classList.remove('hidden');
-                showPage('users');
-            }
+                showPage('dashboard'); // Redirect to dashboard
+            } else if (r.isConfirmed) Swal.fire('Error', 'รหัสผิด', 'error');
         });
     }
-    function adminLogout() {
-        isAdmin = false;
-        document.getElementById('admin-menu').classList.add('hidden');
-        document.getElementById('btn-login').classList.remove('hidden');
-        document.getElementById('btn-logout').classList.add('hidden');
-        showPage('home');
-    }
+    function adminLogout() { isAdmin = false; document.getElementById('admin-menu').classList.add('hidden'); document.getElementById('btn-login').classList.remove('hidden'); document.getElementById('btn-logout').classList.add('hidden'); showPage('home'); }
 
+    // --- MANAGE USERS ---
     function renderUsers() {
         const tb = document.getElementById('table-users');
         tb.innerHTML = students.map(s => `
-            <tr class="border-b hover:bg-gray-50">
-                <td class="p-3"><img src="${s.PhotoUrl||''}" class="w-10 h-10 rounded-full bg-gray-200 object-cover"></td>
-                <td class="p-3">${s.StudentID}</td>
-                <td class="p-3">${s.Name}</td>
-                <td class="p-3 text-sm text-gray-500">${s.Branch}</td>
-                <td class="p-3"><button onclick="delUser('${s.StudentID}')" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td>
+            <tr class="border-b hover:bg-slate-50 transition">
+                <td class="p-3"><img src="${s.PhotoUrl||'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full object-cover border"></td>
+                <td class="p-3 font-mono text-sm">${s.StudentID}</td>
+                <td class="p-3 font-semibold">${s.Name}</td>
+                <td class="p-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${s.Branch}</span></td>
+                <td class="p-3 text-center">
+                    <button onclick="openUserModal('update', '${s.StudentID}')" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button onclick="delUser('${s.StudentID}')" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button>
+                </td>
             </tr>
         `).join('');
     }
 
-    async function loadHistory() {
-        const tb = document.getElementById('table-history');
-        tb.innerHTML = '<tr><td colspan="4" class="p-4 text-center">Loading...</td></tr>';
-        const res = await apiCall('getHistory', 'all');
-        if(res.success) {
-            tb.innerHTML = res.logs.map(l => `
-                <tr class="border-b">
-                    <td class="p-3">${new Date(l.Timestamp).toLocaleString()}</td>
-                    <td class="p-3">${l.Name}</td>
-                    <td class="p-3"><span class="${l.Status==='สาย'?'text-yellow-600':'text-green-600'} font-bold">${l.Status}</span></td>
-                    <td class="p-3"><a href="${l.EvidencePhoto}" target="_blank" class="text-blue-500">รูป</a></td>
-                </tr>
-            `).join('');
+    // Modal Handler
+    function openUserModal(mode, id = null) {
+        document.getElementById('modal-user').classList.remove('hidden');
+        document.getElementById('u-mode').value = mode;
+        document.getElementById('form-user').reset();
+        document.getElementById('f-name').innerText = "คลิกเพื่ออัปโหลดรูป";
+        document.getElementById('u-base64').value = "";
+
+        if (mode === 'update' && id) {
+            const s = students.find(x => x.StudentID == id);
+            if (s) {
+                document.getElementById('modal-title').innerText = "แก้ไขข้อมูลนักเรียน";
+                document.getElementById('u-old-id').value = s.StudentID;
+                document.getElementById('u-id').value = s.StudentID;
+                document.getElementById('u-name').value = s.Name;
+                document.getElementById('u-branch').value = s.Branch;
+                document.getElementById('u-email').value = s.Email;
+            }
+        } else {
+            document.getElementById('modal-title').innerText = "เพิ่มนักเรียนใหม่";
         }
     }
 
-    // --- FORM HANDLERS ---
     document.getElementById('u-file').onchange = e => {
         const fr = new FileReader();
-        fr.onload = x => { 
-            document.getElementById('u-base64').value = x.target.result; 
-            document.getElementById('f-name').innerText = "เลือกรูปแล้ว";
-        };
+        fr.onload = x => { document.getElementById('u-base64').value = x.target.result; document.getElementById('f-name').innerText = "เลือกรูปแล้ว"; };
         fr.readAsDataURL(e.target.files[0]);
     };
 
     document.getElementById('form-user').onsubmit = async (e) => {
         e.preventDefault();
         showLoading(true);
+        const mode = document.getElementById('u-mode').value;
         const data = {
+            OldID: document.getElementById('u-old-id').value,
             StudentID: document.getElementById('u-id').value,
             Name: document.getElementById('u-name').value,
             Branch: document.getElementById('u-branch').value,
             Email: document.getElementById('u-email').value,
             PhotoBase64: document.getElementById('u-base64').value
         };
-        const res = await apiCall('crudManager', { type: 'add', collection: 'students', payload: data });
+        
+        const res = await apiCall('crudManager', { type: mode, collection: 'students', payload: data });
         showLoading(false);
         if(res.success) {
             document.getElementById('modal-user').classList.add('hidden');
-            initApp(); // reload data
-            Swal.fire('Success', 'เพิ่มข้อมูลสำเร็จ', 'success');
+            Swal.fire('Success', res.message, 'success');
+            // Reload data
+            const refresh = await apiCall('getInitialData');
+            if(refresh.success) { students = refresh.students; renderUsers(); }
         } else {
             Swal.fire('Error', res.message, 'error');
         }
     };
 
     async function delUser(id) {
-        if(!confirm('ลบข้อมูล?')) return;
+        if(!confirm('ยืนยันการลบ?')) return;
         showLoading(true);
-        await apiCall('crudManager', { type: 'delete', collection: 'students', payload: { id } });
-        initApp();
+        const res = await apiCall('crudManager', { type: 'delete', collection: 'students', payload: { id } });
+        showLoading(false);
+        if(res.success) {
+            Swal.fire('Deleted', 'ลบข้อมูลสำเร็จ', 'success');
+            const refresh = await apiCall('getInitialData');
+            if(refresh.success) { students = refresh.students; renderUsers(); }
+        } else Swal.fire('Error', res.message, 'error');
     }
 
-    function showLoading(show, txt) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
-        if(txt) document.getElementById('loading-text').innerText = txt;
+    // --- DASHBOARD & HISTORY ---
+    async function loadDashboard() {
+        const res = await apiCall('getDashboardStats');
+        if(res.success) {
+            document.getElementById('adm-total').innerText = res.totalStudents;
+            document.getElementById('adm-present').innerText = res.todayCheckIn;
+            document.getElementById('adm-late').innerText = res.todayLate;
+            document.getElementById('adm-absent').innerText = res.todayAbsent;
+            
+            // Chart
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            if(window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['ปกติ', 'สาย', 'ขาด'],
+                    datasets: [{ data: [res.todayCheckIn - res.todayLate, res.todayLate, res.todayAbsent], backgroundColor: ['#22c55e', '#eab308', '#ef4444'] }]
+                }
+            });
+        }
     }
+
+    async function loadHistory() {
+        const tb = document.getElementById('table-history');
+        tb.innerHTML = '<tr><td colspan="5" class="p-4 text-center">กำลังโหลด...</td></tr>';
+        const res = await apiCall('getHistory', 'all');
+        if(res.success) {
+            tb.innerHTML = res.logs.length ? res.logs.map(l => `
+                <tr class="border-b">
+                    <td class="p-3">${new Date(l.Timestamp).toLocaleString('th-TH')}</td>
+                    <td class="p-3 font-semibold">${l.Name}</td>
+                    <td class="p-3 text-sm">${l.Branch}</td>
+                    <td class="p-3"><span class="${l.Status==='สาย'?'text-yellow-600':'text-green-600'} font-bold">${l.Status}</span></td>
+                    <td class="p-3"><a href="${l.EvidencePhoto}" target="_blank" class="text-blue-500 hover:underline text-xs">ดูรูป</a></td>
+                </tr>`).join('') : '<tr><td colspan="5" class="p-4 text-center">ไม่พบข้อมูล</td></tr>';
+        }
+    }
+
+    // --- NOTIFY ---
+    function populateNotifyBranch(branches) {
+        const sel = document.getElementById('notify-branch');
+        if(sel) {
+            branches.forEach(b => {
+                const opt = document.createElement('option'); opt.value = b.BranchName; opt.innerText = b.BranchName;
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    function sendNotify() {
+        const branch = document.getElementById('notify-branch').value;
+        const subject = document.getElementById('notify-subject').value;
+        const detail = document.getElementById('notify-msg').value;
+        if(!subject || !detail) return Swal.fire('Error', 'กรอกข้อมูลให้ครบ', 'warning');
+        
+        showLoading(true, "กำลังส่งเมล...");
+        apiCall('sendAnnouncement', { branch, subject, detail }).then(res => {
+            showLoading(false);
+            Swal.fire(res.success?'Success':'Error', res.message, res.success?'success':'error');
+        });
+    }
+
+    function showLoading(show, txt) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; if(txt) document.getElementById('loading-text').innerText = txt; }
   </script>
 </body>
 </html>
