@@ -189,9 +189,7 @@
         try {
             const response = await fetch(API_URL, {
                 method: 'POST',
-                mode: 'no-cors', // สำคัญ: ถ้าใช้ no-cors จะอ่าน response ไม่ได้ แต่ส่งข้อมูลได้ (ใน GAS ต้องใช้ redirect: follow ซึ่ง fetch client-side ปกติจะติด CORS)
-                // ดังนั้นเราใช้เทคนิคส่ง text/plain เพื่อเลี่ยง preflight แต่ GAS ต้องรองรับ
-                // วิธีแก้ที่ง่ายที่สุดสำหรับโปรเจกต์นี้คือใช้ redirect: "follow" และ Content-Type: "text/plain"
+                // ลบ mode: 'no-cors' ออก เพื่อให้สามารถอ่าน Response JSON ได้
                 redirect: "follow",
                 headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify({ action, data })
