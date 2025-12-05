@@ -49,6 +49,7 @@
                 <button onclick="showPage('attendance')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">🕒 ประวัติลงเวลา</button>
                 <button onclick="showPage('announce')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">📢 แจ้งข่าวสาร</button>
                 <button onclick="showPage('settings')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">⚙️ ตั้งค่า (สาขา/ชั้น)</button>
+                <button onclick="showPage('summary')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">📑 สรุปเวลาฝึกงาน</button>
             </nav>
             <div class="p-4 border-t border-slate-700">
                 <button onclick="logout()" class="w-full bg-red-600 py-2 rounded hover:bg-red-700">ออกจากระบบ</button>
@@ -169,6 +170,37 @@
                     </table>
                 </div>
             </div>
+            <div id="page-summary" class="page-section hidden p-6">
+                <h2 class="text-2xl font-bold mb-4">สรุปเวลาฝึกงานรายบุคคล</h2>
+                
+                <div class="bg-white p-4 rounded shadow mb-4 flex flex-col md:flex-row gap-4 items-center justify-between">
+                    <div class="flex gap-4 w-full md:w-auto">
+                        <select id="sum-filter-dept" class="border p-2 rounded w-full md:w-48">
+                            <option value="">ทุกสาขา</option>
+                        </select>
+                        <button onclick="loadInternshipSummary()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">รีเฟรช</button>
+                    </div>
+                    </div>
+
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b uppercase text-sm text-gray-600">
+                            <tr>
+                                <th class="p-3">รูป</th>
+                                <th class="p-3">รหัส</th>
+                                <th class="p-3">ชื่อ-สกุล</th>
+                                <th class="p-3">สาขา</th>
+                                <th class="p-3 text-center">มาเรียน (วัน)</th>
+                                <th class="p-3 text-center text-orange-600">สาย (ครั้ง)</th>
+                                <th class="p-3 text-center text-red-600">ลา (ครั้ง)</th>
+                                <th class="p-3 text-right">ชั่วโมงรวม</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summary-table-body" class="text-sm">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
 
             <div id="page-announce" class="page-section hidden p-6">
                 <h2 class="text-2xl font-bold mb-6">แจ้งข่าวสาร (Email)</h2>
@@ -215,6 +247,7 @@
 
         </main>
     </div>
+
 
     <div id="member-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -455,6 +488,9 @@
         if(!document.getElementById('page-dashboard').classList.contains('hidden')) loadDashboard();
         if(!document.getElementById('page-members').classList.contains('hidden')) loadMembersTable();
         if(!document.getElementById('page-attendance').classList.contains('hidden')) loadAttendanceTable();
+        // --- เพิ่มบรรทัดนี้ครับ ---
+        if(!document.getElementById('page-summary').classList.contains('hidden')) loadInternshipSummary();
+        // -----------------------
     }
 
     function updateSelects(depts, levels) {
@@ -465,6 +501,9 @@
         document.getElementById('mem-level').innerHTML = levelOpts;
         document.getElementById('att-filter-dept').innerHTML = '<option value="">ทุกสาขา</option>' + deptOpts;
         document.getElementById('ann-target').innerHTML = '<option value="all">ทั้งหมด</option>' + deptOpts;
+        // --- เพิ่มบรรทัดนี้ครับ ---
+        document.getElementById('sum-filter-dept').innerHTML = '<option value="">ทุกสาขา</option>' + deptOpts; 
+        // -----------------------
 
         document.getElementById('list-depts').innerHTML = depts.map((d, i) => `<li class="flex justify-between bg-gray-50 p-2">${d[0]} <button onclick="delSetting('deleteDepartment', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
         document.getElementById('list-levels').innerHTML = levels.map((l, i) => `<li class="flex justify-between bg-gray-50 p-2">${l[0]} <button onclick="delSetting('deleteLevel', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
@@ -693,6 +732,52 @@
             }
         }
     };
+    // --- INTERNSHIP SUMMARY LOGIC ---
+    let summaryDataCache = [];
+
+    async function loadInternshipSummary() {
+        showLoading(true);
+        const data = await callAPI('getInternshipStats');
+        showLoading(false);
+
+        if (data) {
+            summaryDataCache = data;
+            renderSummaryTable();
+        }
+    }
+
+    function renderSummaryTable() {
+        const filterDept = document.getElementById('sum-filter-dept').value;
+        const tbody = document.getElementById('summary-table-body');
+        tbody.innerHTML = '';
+
+        const filteredData = summaryDataCache.filter(item => {
+            return filterDept === "" || item.dept === filterDept;
+        });
+
+        if (filteredData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center p-4">ไม่พบข้อมูล</td></tr>';
+            return;
+        }
+
+        filteredData.forEach(row => {
+            tbody.innerHTML += `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3"><img src="${row.img || 'https://placehold.co/40'}" class="w-10 h-10 rounded-full object-cover border"></td>
+                    <td class="p-3 font-mono">${row.id}</td>
+                    <td class="p-3 font-medium">${row.name}</td>
+                    <td class="p-3 text-gray-500">${row.dept}</td>
+                    <td class="p-3 text-center font-bold">${row.totalDays}</td>
+                    <td class="p-3 text-center text-orange-600 font-bold">${row.late}</td>
+                    <td class="p-3 text-center text-red-600 font-bold">${row.leave}</td>
+                    <td class="p-3 text-right font-bold text-blue-700">${row.hours} ชม.</td>
+                </tr>
+            `;
+        });
+    }
+
+    // Event Listener สำหรับ Dropdown สาขาในหน้าสรุป
+    document.getElementById('sum-filter-dept').addEventListener('change', renderSummaryTable);
 </script>
 </body>
 </html>
