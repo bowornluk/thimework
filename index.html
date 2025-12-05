@@ -595,21 +595,29 @@
 
     // --- ATTENDANCE TABLE ---
     async function loadAttendanceTable() {
-        const data = await callAPI('getAttendance');
-        const tbody = document.getElementById('attendance-table-body');
-        tbody.innerHTML = data.map(r => `
-            <tr class="border-b text-sm">
-                <td class="p-2">${new Date(r[2]).toLocaleDateString('th-TH')}</td>
-                <td class="p-2">${r[0]}</td>
-                <td class="p-2">${r[1]}</td>
-                <td class="p-2 text-green-600 font-bold">${new Date(r[2]).toLocaleDateString('th-TH') === r[2] ? r[3] : r[3].substring(0,5)}</td>
-                <td class="p-2">${r[4] ? r[4].substring(0,5) : '-'}</td>
-                <td class="p-2"><span class="px-2 py-1 rounded text-xs text-white ${r[5]==='สาย'?'bg-orange-500':'bg-green-500'}">${r[5]}</span></td>
-                <td class="p-2 font-bold">${r[6] || '-'}</td>
-                <td class="p-2 text-xs text-blue-500 truncate max-w-[100px]">${r[7] ? `<a href="https://maps.google.com/?q=${r[7]},${r[8]}" target="_blank">Map</a>` : '-'}</td>
-            </tr>
-        `).join('');
-    }
+    const data = await callAPI('getAttendance');
+    const tbody = document.getElementById('attendance-table-body');
+    
+    tbody.innerHTML = data.map(r => `
+        <tr class="border-b text-sm hover:bg-gray-50">
+            <td class="p-2">${new Date(r[2]).toLocaleDateString('th-TH')}</td>
+            <td class="p-2">${r[0]}</td>
+            <td class="p-2">${r[1]}</td>
+            <td class="p-2 text-green-600 font-bold">${r[3] ? String(r[3]).substring(0,5) : '-'}</td>
+            <td class="p-2 text-red-600 font-bold">${r[4] ? String(r[4]).substring(0,5) : '-'}</td>
+            <td class="p-2">
+                <span class="px-2 py-1 rounded text-xs text-white ${r[5]==='สาย'?'bg-orange-500':'bg-green-500'}">
+                    ${r[5]}
+                </span>
+            </td>
+            <td class="p-2 font-bold">${r[6] || '-'}</td>
+            
+            <td class="p-2 text-xs text-gray-600 truncate max-w-[200px]" title="${r[7]}">
+                ${r[7] || '-'}
+            </td>
+        </tr>
+    `).join('');
+}
 
     // --- ANNOUNCEMENTS ---
     async function sendAnnouncement() {
