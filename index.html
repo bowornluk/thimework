@@ -1,486 +1,664 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบลงเวลาฝึกงาน AI Pro</title>
-  
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
-
-  <style>
-    body { font-family: 'Sarabun', sans-serif; }
-    .sidebar-active { background-color: #1e3a8a; border-left: 4px solid #60a5fa; }
-    .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3b82f6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    #video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
-    #overlay { position: absolute; top: 0; left: 0; transform: scaleX(-1); }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็คชื่อนักศึกษาฝึกงาน (Internship System)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+        .loader { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #video.mirrored, #canvas.mirrored { transform: scaleX(-1); }
+        .hidden { display: none !important; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="bg-gray-50 text-gray-800 h-screen flex flex-col overflow-hidden">
 
-  <!-- URL MODAL -->
-  <div id="url-modal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-[100] hidden">
-      <div class="bg-white p-8 rounded-xl w-full max-w-lg shadow-2xl text-center">
-          <h2 class="text-2xl font-bold text-blue-900 mb-4">เชื่อมต่อระบบ</h2>
-          <p class="text-gray-600 mb-4">นำ Web App URL มาใส่ที่นี่เพื่อเริ่มต้น</p>
-          <input type="text" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." class="w-full p-3 border rounded-lg mb-4">
-          <button onclick="saveUrl()" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 w-full font-bold">บันทึกและเริ่มใช้งาน</button>
-      </div>
-  </div>
-
-  <div class="flex h-screen overflow-hidden">
-    <!-- SIDEBAR -->
-    <aside class="w-64 bg-slate-900 text-white hidden md:flex flex-col shadow-xl">
-      <div class="p-6 flex items-center gap-3 border-b border-slate-700">
-        <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-blue-900 font-bold text-xl"><i class="fa-solid fa-school"></i></div>
-        <div><h1 class="font-bold text-lg">ระบบฝึกงาน</h1><p class="text-xs text-slate-400">AI Attendance</p></div>
-      </div>
-      <nav class="flex-1 p-4 space-y-2">
-        <a onclick="showPage('home')" id="nav-home" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800 sidebar-active"><i class="fa-solid fa-camera"></i> ลงเวลา</a>
-        <div id="admin-menu" class="hidden">
-            <div class="pt-4 pb-2 text-xs text-slate-500 uppercase font-semibold">ผู้ดูแลระบบ</div>
-            <a onclick="showPage('dashboard')" id="nav-dashboard" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-chart-pie"></i> แดชบอร์ด</a>
-            <a onclick="showPage('users')" id="nav-users" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-users"></i> ข้อมูลนักเรียน</a>
-            <a onclick="showPage('history')" id="nav-history" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-clock-rotate-left"></i> ประวัติลงเวลา</a>
-            <a onclick="showPage('notify')" id="nav-notify" class="cursor-pointer flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-slate-800"><i class="fa-solid fa-bullhorn"></i> แจ้งประกาศ</a>
+    <div id="config-modal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-[60] hidden">
+        <div class="bg-white p-6 rounded shadow-lg w-96">
+            <h2 class="text-xl font-bold mb-4">เชื่อมต่อระบบ</h2>
+            <input type="url" id="web-app-url" class="w-full border p-2 rounded mb-4" placeholder="วาง Google Web App URL ที่นี่">
+            <button onclick="saveConfig()" class="bg-blue-600 text-white w-full py-2 rounded">บันทึก</button>
         </div>
-      </nav>
-      <div class="p-4 border-t border-slate-700">
-        <button id="btn-login" onclick="adminLogin()" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:text-white"><i class="fa-solid fa-lock"></i> Login Admin</button>
-        <button id="btn-logout" onclick="adminLogout()" class="hidden w-full text-left px-4 py-2 text-sm text-red-400"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-        <button onclick="resetUrl()" class="w-full text-left px-4 py-2 text-xs text-gray-500 hover:text-gray-300 mt-2"><i class="fa-solid fa-link"></i> Reset URL</button>
-      </div>
-    </aside>
+    </div>
 
-    <!-- MAIN CONTENT -->
-    <main class="flex-1 flex flex-col h-screen overflow-y-auto bg-slate-50 relative">
-        <div id="loading" class="hidden fixed inset-0 bg-black/80 flex-col items-center justify-center z-50">
-            <div class="loader mb-4"></div><p id="loading-text" class="text-white">กำลังประมวลผล...</p>
+    <div id="login-modal" class="fixed inset-0 bg-gray-900 bg-opacity-90 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-center mb-6 text-gray-700">เข้าสู่ระบบ Admin</h2>
+            <input type="text" id="admin-user" class="w-full border p-3 rounded mb-4" placeholder="ชื่อผู้ใช้">
+            <input type="password" id="admin-pass" class="w-full border p-3 rounded mb-6" placeholder="รหัสผ่าน">
+            <div class="flex gap-2">
+                <button onclick="closeLogin()" class="flex-1 bg-gray-200 py-2 rounded">ยกเลิก</button>
+                <button onclick="doLogin()" class="flex-1 bg-blue-600 text-white py-2 rounded hover:bg-blue-700">เข้าสู่ระบบ</button>
+            </div>
         </div>
+    </div>
 
-        <!-- 1. HOME: SCANNER -->
-        <div id="page-home" class="page-section p-6 max-w-4xl mx-auto w-full">
-            <div class="bg-white rounded-2xl shadow-xl p-6 text-center border-t-8 border-blue-600">
-                <h2 class="text-2xl font-bold mb-2">ลงเวลาด้วยใบหน้า</h2>
-                <p id="ai-status" class="text-slate-500 mb-6">กำลังเตรียมระบบ AI...</p>
-                <div class="relative w-full max-w-lg mx-auto aspect-video bg-black rounded-xl overflow-hidden shadow-inner mb-6">
-                    <video id="video" autoplay muted playsinline></video>
-                    <canvas id="overlay"></canvas>
-                    <div id="cam-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-400 bg-slate-900">
-                        <i class="fa-solid fa-camera fa-3x mb-4"></i><p>กด "เริ่มสแกน"</p>
+    <div class="flex h-full" id="main-layout">
+        
+        <aside id="sidebar" class="w-64 bg-slate-800 text-white hidden flex-col transition-all duration-300">
+            <div class="p-6 text-center font-bold text-xl border-b border-slate-700">Internship Admin</div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="showPage('dashboard')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">📊 แดชบอร์ด</button>
+                <button onclick="showPage('members')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">👥 จัดการสมาชิก</button>
+                <button onclick="showPage('attendance')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">🕒 ประวัติลงเวลา</button>
+                <button onclick="showPage('announce')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">📢 แจ้งข่าวสาร</button>
+                <button onclick="showPage('settings')" class="w-full text-left p-3 hover:bg-slate-700 rounded flex items-center gap-2">⚙️ ตั้งค่า (สาขา/ชั้น)</button>
+            </nav>
+            <div class="p-4 border-t border-slate-700">
+                <button onclick="logout()" class="w-full bg-red-600 py-2 rounded hover:bg-red-700">ออกจากระบบ</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 overflow-y-auto relative">
+            
+            <header id="public-header" class="bg-white shadow p-4 flex justify-between items-center sticky top-0 z-40">
+                <h1 class="text-xl md:text-2xl font-bold text-blue-700">ระบบลงเวลาฝึกงาน</h1>
+                <div class="flex gap-2">
+                    <button onclick="openMyStats()" class="bg-teal-500 text-white px-4 py-2 rounded hover:bg-teal-600 text-sm">ตรวจสอบเวลาเรียน</button>
+                    <button onclick="openLogin()" class="bg-slate-700 text-white px-4 py-2 rounded hover:bg-slate-800 text-sm">เจ้าหน้าที่</button>
+                    <button onclick="resetConfig()" class="text-xs text-gray-400 underline">Reset URL</button>
+                </div>
+            </header>
+
+            <div id="page-scan" class="p-4 md:p-8 max-w-4xl mx-auto text-center">
+                <div class="bg-white p-6 rounded-xl shadow-lg">
+                    <h2 class="text-2xl font-bold mb-2">สแกนใบหน้าเพื่อ ลงเวลา</h2>
+                    <p class="text-gray-500 mb-6">กรุณายืนหน้าตรง ไม่สวมหน้ากากอนามัย</p>
+
+                    <div class="relative bg-black rounded-lg overflow-hidden mx-auto w-full max-w-lg aspect-video mb-4 flex items-center justify-center">
+                        <video id="video" class="absolute w-full h-full object-cover hidden mirrored" autoplay muted playsinline></video>
+                        <canvas id="canvas" class="absolute w-full h-full mirrored"></canvas>
+                        <div id="camera-placeholder" class="text-gray-400 flex flex-col items-center">
+                            <svg class="w-16 h-16 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            <span>กล้องปิดอยู่</span>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col items-center gap-4">
+                        <select id="camera-select" class="border p-2 rounded mb-2 hidden"></select>
+                        <button id="toggle-scan-btn" class="bg-blue-600 text-white text-lg px-8 py-3 rounded-full shadow-lg hover:bg-blue-700 transition w-48">เริ่มสแกน</button>
+                    </div>
+
+                    <div id="scan-log" class="mt-6 text-left max-h-40 overflow-y-auto bg-gray-100 p-4 rounded text-sm">
+                        <p class="text-gray-400 text-center italic">ประวัติการสแกนวันนี้...</p>
                     </div>
                 </div>
-                <div class="flex justify-center gap-4">
-                    <button id="btn-start" onclick="startCamera()" class="px-8 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 shadow-lg disabled:bg-gray-400" disabled><i class="fa-solid fa-play"></i> เริ่มสแกน</button>
-                    <button id="btn-stop" onclick="stopCamera()" class="hidden px-8 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg"><i class="fa-solid fa-stop"></i> หยุด</button>
-                </div>
             </div>
-        </div>
 
-        <!-- 2. ADMIN DASHBOARD (กู้คืนแล้ว) -->
-        <div id="page-dashboard" class="page-section p-6 hidden w-full">
-            <h2 class="text-2xl font-bold mb-6 text-blue-800 border-l-4 border-blue-600 pl-3">ภาพรวมระบบ (Dashboard)</h2>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-blue-500">
-                    <p class="text-xs text-slate-500">นักเรียนทั้งหมด</p>
-                    <h3 id="adm-total" class="text-3xl font-bold text-blue-700">0</h3>
+            <div id="page-dashboard" class="page-section hidden p-6">
+                <h2 class="text-2xl font-bold mb-6">ภาพรวมระบบ (Dashboard)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-blue-500">
+                        <div class="text-gray-500 text-sm">นักศึกษาทั้งหมด</div>
+                        <div class="text-2xl font-bold" id="stat-total-users">-</div>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-green-500">
+                        <div class="text-gray-500 text-sm">เข้างานวันนี้</div>
+                        <div class="text-2xl font-bold" id="stat-checked-in">-</div>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-yellow-500">
+                        <div class="text-gray-500 text-sm">มาสายวันนี้</div>
+                        <div class="text-2xl font-bold" id="stat-late">-</div>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow border-l-4 border-red-500">
+                        <div class="text-gray-500 text-sm">ขาด/ไม่ลงเวลา</div>
+                        <div class="text-2xl font-bold" id="stat-absent">-</div>
+                    </div>
                 </div>
-                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-green-500">
-                    <p class="text-xs text-slate-500">มาวันนี้</p>
-                    <h3 id="adm-present" class="text-3xl font-bold text-green-700">0</h3>
-                </div>
-                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-yellow-500">
-                    <p class="text-xs text-slate-500">มาสาย</p>
-                    <h3 id="adm-late" class="text-3xl font-bold text-yellow-700">0</h3>
-                </div>
-                <div class="bg-white p-4 rounded-xl shadow-sm border-b-4 border-red-500">
-                    <p class="text-xs text-slate-500">ขาด/ยังไม่มา</p>
-                    <h3 id="adm-absent" class="text-3xl font-bold text-red-700">0</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-4 rounded shadow">
+                        <h3 class="font-bold mb-4">สัดส่วนตามสาขาวิชา</h3>
+                        <canvas id="deptChart"></canvas>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow">
+                        <h3 class="font-bold mb-4">สถิติการเข้างานวันนี้</h3>
+                        <canvas id="dailyChart"></canvas>
+                    </div>
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm max-w-2xl mx-auto">
-                <h4 class="font-bold mb-4 text-center">สถิติการเข้างานวันนี้</h4>
-                <canvas id="adminChart"></canvas>
-            </div>
-        </div>
 
-        <!-- 3. ADMIN USERS (Manage & Edit) -->
-        <div id="page-users" class="page-section p-6 hidden w-full">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold border-l-4 border-blue-600 pl-3">จัดการข้อมูลนักเรียน</h2>
-                <button onclick="openUserModal('add')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 shadow"><i class="fa-solid fa-plus"></i> เพิ่มนักเรียน</button>
+            <div id="page-members" class="page-section hidden p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">จัดการสมาชิก</h2>
+                    <button onclick="openMemberModal()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">+ เพิ่มสมาชิก</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 border-b">
+                            <tr>
+                                <th class="p-3">รูป</th>
+                                <th class="p-3">รหัส</th>
+                                <th class="p-3">ชื่อ-สกุล</th>
+                                <th class="p-3">สาขา</th>
+                                <th class="p-3">อีเมล</th>
+                                <th class="p-3">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-table-body"></tbody>
+                    </table>
+                </div>
             </div>
-            <div class="bg-white rounded-xl shadow overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-slate-50 border-b">
-                        <tr>
-                            <th class="p-4">รูป</th>
-                            <th class="p-4">รหัส</th>
-                            <th class="p-4">ชื่อ-สกุล</th>
-                            <th class="p-4">สาขา</th>
-                            <th class="p-4 text-center">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-users" class="divide-y divide-slate-100"></tbody>
-                </table>
+
+             <div id="page-attendance" class="page-section hidden p-6">
+                <h2 class="text-2xl font-bold mb-4">ประวัติการลงเวลา</h2>
+                <div class="bg-white p-4 rounded shadow mb-4 flex gap-4">
+                    <input type="text" placeholder="ค้นหาชื่อ..." id="att-search" class="border p-2 rounded">
+                    <select id="att-filter-dept" class="border p-2 rounded"><option value="">ทุกสาขา</option></select>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto h-[600px]">
+                    <table class="w-full text-left relative">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="p-3">วันที่</th>
+                                <th class="p-3">รหัส</th>
+                                <th class="p-3">ชื่อ</th>
+                                <th class="p-3">เข้า</th>
+                                <th class="p-3">ออก</th>
+                                <th class="p-3">สถานะ</th>
+                                <th class="p-3">ชม.รวม</th>
+                                <th class="p-3">พิกัด</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendance-table-body"></tbody>
+                    </table>
+                </div>
             </div>
-        </div>
 
-        <!-- 4. ADMIN HISTORY -->
-        <div id="page-history" class="page-section p-6 hidden w-full">
-             <div class="flex justify-between items-center mb-6">
-                 <h2 class="text-2xl font-bold border-l-4 border-blue-600 pl-3">ประวัติการลงเวลา</h2>
-                 <button onclick="loadHistory()" class="bg-slate-200 p-2 rounded hover:bg-slate-300"><i class="fa-solid fa-rotate"></i> รีเฟรช</button>
-             </div>
-             <div class="bg-white rounded-xl shadow overflow-x-auto p-4">
-                 <table class="w-full text-sm">
-                     <thead class="bg-slate-100"><tr><th class="p-3">เวลา</th><th class="p-3">ชื่อ</th><th class="p-3">สาขา</th><th class="p-3">สถานะ</th><th class="p-3">หลักฐาน</th></tr></thead>
-                     <tbody id="table-history"></tbody>
-                 </table>
-             </div>
-        </div>
+            <div id="page-announce" class="page-section hidden p-6">
+                <h2 class="text-2xl font-bold mb-6">แจ้งข่าวสาร (Email)</h2>
+                <div class="bg-white p-6 rounded shadow max-w-2xl">
+                    <div class="mb-4">
+                        <label class="block mb-1 font-bold">หัวข้อเรื่อง</label>
+                        <input type="text" id="ann-topic" class="w-full border p-2 rounded">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block mb-1 font-bold">ส่งถึงกลุ่มเป้าหมาย</label>
+                        <select id="ann-target" class="w-full border p-2 rounded">
+                            <option value="all">นักศึกษาทั้งหมด</option>
+                            </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block mb-1 font-bold">ข้อความรายละเอียด</label>
+                        <textarea id="ann-message" rows="5" class="w-full border p-2 rounded"></textarea>
+                    </div>
+                    <button onclick="sendAnnouncement()" class="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">ส่งประกาศ</button>
+                </div>
+            </div>
 
-        <!-- 5. ADMIN NOTIFY -->
-        <div id="page-notify" class="page-section p-6 hidden w-full">
-            <h2 class="text-2xl font-bold mb-6 border-l-4 border-blue-600 pl-3">ส่งประกาศ (Email)</h2>
-            <div class="bg-white p-6 rounded-xl shadow max-w-2xl mx-auto">
-                <div class="space-y-4">
+            <div id="page-settings" class="page-section hidden p-6">
+                <h2 class="text-2xl font-bold mb-6">ตั้งค่าระบบ (ข้อมูลพื้นฐาน)</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-4 rounded shadow">
+                        <h3 class="font-bold mb-2">สาขาวิชา</h3>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" id="new-dept-name" class="border p-1 rounded flex-1" placeholder="ชื่อสาขา">
+                            <button onclick="addSetting('Department')" class="bg-blue-500 text-white px-3 rounded">เพิ่ม</button>
+                        </div>
+                        <ul id="list-depts" class="space-y-1"></ul>
+                    </div>
+                    <div class="bg-white p-4 rounded shadow">
+                        <h3 class="font-bold mb-2">ระดับชั้น</h3>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" id="new-level-name" class="border p-1 rounded flex-1" placeholder="ชื่อระดับชั้น">
+                            <button onclick="addSetting('Level')" class="bg-blue-500 text-white px-3 rounded">เพิ่ม</button>
+                        </div>
+                        <ul id="list-levels" class="space-y-1"></ul>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="member-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50 hidden">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold mb-4" id="member-modal-title">เพิ่ม/แก้ไข สมาชิก</h2>
+            <form id="member-form">
+                <input type="hidden" id="mem-row-index">
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div><label class="block text-sm">รหัส</label><input type="text" id="mem-id" class="w-full border p-2 rounded" required></div>
+                    <div><label class="block text-sm">ชื่อ-สกุล</label><input type="text" id="mem-name" class="w-full border p-2 rounded" required></div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                        <label class="block text-sm font-bold mb-1">ส่งถึงสาขา</label>
-                        <select id="notify-branch" class="w-full p-2 border rounded-lg bg-white"><option value="all">ทั้งหมด</option></select>
+                        <label class="block text-sm">สาขา</label>
+                        <select id="mem-dept" class="w-full border p-2 rounded"></select>
                     </div>
                     <div>
-                        <label class="block text-sm font-bold mb-1">หัวข้อประกาศ</label>
-                        <input type="text" id="notify-subject" placeholder="ระบุหัวข้อ..." class="w-full p-2 border rounded-lg">
+                        <label class="block text-sm">ระดับชั้น</label>
+                        <select id="mem-level" class="w-full border p-2 rounded"></select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-bold mb-1">รายละเอียด</label>
-                        <textarea id="notify-msg" rows="5" placeholder="พิมพ์ข้อความ..." class="w-full p-2 border rounded-lg"></textarea>
-                    </div>
-                    <button onclick="sendNotify()" class="bg-green-600 text-white w-full py-3 rounded-lg hover:bg-green-700 font-bold shadow"><i class="fa-solid fa-paper-plane"></i> ส่งประกาศ</button>
                 </div>
-            </div>
+                <div class="mb-4">
+                    <label class="block text-sm">อีเมล</label>
+                    <input type="email" id="mem-email" class="w-full border p-2 rounded">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm">รูปถ่าย (หน้าตรง)</label>
+                    <input type="file" id="mem-img" accept="image/*" class="w-full text-sm">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="document.getElementById('member-modal').classList.add('hidden')" class="bg-gray-300 px-4 py-2 rounded">ยกเลิก</button>
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">บันทึก</button>
+                </div>
+            </form>
         </div>
+    </div>
 
-    </main>
-  </div>
+    <div id="loading" class="fixed inset-0 bg-white bg-opacity-80 flex flex-col items-center justify-center z-[100] hidden">
+        <div class="loader w-12 h-12 rounded-full border-4 border-gray-200"></div>
+        <p class="mt-2 text-gray-600">กำลังทำงาน...</p>
+    </div>
 
-  <!-- USER MODAL (Add & Edit) -->
-  <div id="modal-user" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[70]">
-      <div class="bg-white p-6 rounded-xl w-full max-w-md shadow-2xl">
-          <h3 class="font-bold text-xl mb-4 text-blue-900" id="modal-title">เพิ่มนักเรียน</h3>
-          <form id="form-user" class="space-y-3">
-              <input type="hidden" id="u-mode" value="add"> <!-- add or update -->
-              <input type="hidden" id="u-old-id"> <!-- for update ref -->
-              
-              <div><label class="text-xs font-bold">รหัส</label><input id="u-id" class="w-full border p-2 rounded" required></div>
-              <div><label class="text-xs font-bold">ชื่อ-สกุล</label><input id="u-name" class="w-full border p-2 rounded" required></div>
-              <div><label class="text-xs font-bold">สาขา</label><input id="u-branch" class="w-full border p-2 rounded" required></div>
-              <div><label class="text-xs font-bold">อีเมล</label><input id="u-email" type="email" class="w-full border p-2 rounded"></div>
-              
-              <div class="border-2 border-dashed p-4 text-center cursor-pointer hover:bg-gray-50 transition" onclick="document.getElementById('u-file').click()">
-                  <i class="fa-solid fa-image text-gray-400 mb-1"></i><br>
-                  <span id="f-name" class="text-sm text-gray-500">คลิกเพื่ออัปโหลดรูป (สำหรับ AI)</span>
-                  <input type="file" id="u-file" class="hidden" accept="image/*">
-                  <input type="hidden" id="u-base64">
-              </div>
-              
-              <div class="flex justify-end gap-2 mt-6">
-                  <button type="button" onclick="document.getElementById('modal-user').classList.add('hidden')" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">ยกเลิก</button>
-                  <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">บันทึก</button>
-              </div>
-          </form>
-      </div>
-  </div>
-
-  <script>
-    // --- CORE ---
-    let API_URL = localStorage.getItem('GAS_API_URL') || '';
-    let isAdmin = false;
-    let students = [];
+<script>
+    // --- CONFIG & STATE ---
+    let WEB_APP_URL = localStorage.getItem('webapp_url') || '';
+    const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
     let faceMatcher = null;
-    let stream = null;
+    let studentsData = [];
+    let isCameraActive = false;
+    let checkInInterval = null;
+    let isAdmin = false;
+    
+    // --- INIT ---
+    document.addEventListener('DOMContentLoaded', async () => {
+        if(!WEB_APP_URL) document.getElementById('config-modal').classList.remove('hidden');
+        else await loadModels();
+    });
 
-    window.onload = () => {
-        if(!API_URL) document.getElementById('url-modal').classList.remove('hidden');
-        else initApp();
+    const saveConfig = () => {
+        const url = document.getElementById('web-app-url').value;
+        if(url) { localStorage.setItem('webapp_url', url); location.reload(); }
     };
+    const resetConfig = () => { localStorage.removeItem('webapp_url'); location.reload(); };
+    const showLoading = (show) => document.getElementById('loading').classList.toggle('hidden', !show);
 
-    function saveUrl() {
-        const url = document.getElementById('gas-url-input').value.trim();
-        if(url) { localStorage.setItem('GAS_API_URL', url); API_URL = url; document.getElementById('url-modal').classList.add('hidden'); initApp(); }
-    }
-    function resetUrl() { localStorage.removeItem('GAS_API_URL'); location.reload(); }
-
-    async function initApp() {
-        showLoading(true, "กำลังเชื่อมต่อระบบ...");
-        const res = await apiCall('getInitialData');
-        if(res.success) {
-            students = res.students;
-            renderUsers();
-            populateNotifyBranch(res.branches || []);
-        } else {
-            Swal.fire('Connection Failed', 'ตรวจสอบ URL หรือลองใหม่', 'error');
-        }
-        await loadAI();
+    // --- FACE API & SCANNING ---
+    async function loadModels() {
+        showLoading(true);
+        await Promise.all([
+            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        ]);
+        await loadStudentsForFace();
         showLoading(false);
     }
 
-    async function apiCall(action, data = {}) {
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                redirect: "follow",
-                headers: { "Content-Type": "text/plain;charset=utf-8" },
-                body: JSON.stringify({ action, data })
-            });
-            return await response.json();
-        } catch (e) { return { success: false, message: "Connection Error" }; }
+    async function loadStudentsForFace() {
+        const res = await callAPI('getUsers');
+        if(res) {
+            studentsData = res.map(row => ({
+                id: row[0], name: row[1], level: row[2], dept: row[3], email: row[4],
+                faceEncoding: row[5], img: row[6]
+            }));
+            const labeledDescriptors = studentsData
+                .filter(s => s.faceEncoding)
+                .map(s => new faceapi.LabeledFaceDescriptors(String(s.id), [new Float32Array(JSON.parse(s.faceEncoding))]));
+            if(labeledDescriptors.length > 0) faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
+        }
     }
 
-    // --- AI ---
-    async function loadAI() {
-        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-        try {
-            await Promise.all([
-                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-            ]);
-            document.getElementById('ai-status').innerText = "AI พร้อมใช้งาน";
-            document.getElementById('btn-start').disabled = false;
-            
-            if(students.length > 0) {
-                const labeled = await Promise.all(students.map(async s => {
-                    if(!s.PhotoUrl) return null;
-                    try {
-                        const img = await faceapi.fetchImage(s.PhotoUrl);
-                        const d = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-                        return d ? new faceapi.LabeledFaceDescriptors(s.StudentID, [d.descriptor]) : null;
-                    } catch(e){ return null; }
-                }));
-                const valid = labeled.filter(d => d);
-                if(valid.length) faceMatcher = new faceapi.FaceMatcher(valid, 0.6);
-            }
-        } catch(e) { document.getElementById('ai-status').innerText = "AI Error (Refresh Page)"; }
-    }
+    document.getElementById('toggle-scan-btn').addEventListener('click', toggleScan);
 
-    async function startCamera() {
-        document.getElementById('cam-placeholder').classList.add('hidden');
-        document.getElementById('btn-start').classList.add('hidden');
-        document.getElementById('btn-stop').classList.remove('hidden');
-        stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+    async function toggleScan() {
+        const btn = document.getElementById('toggle-scan-btn');
         const video = document.getElementById('video');
-        video.srcObject = stream;
-        video.addEventListener('play', () => {
-            const canvas = document.getElementById('overlay');
-            const dim = { width: video.videoWidth, height: video.videoHeight };
-            faceapi.matchDimensions(canvas, dim);
-            const loop = setInterval(async () => {
-                if(!stream) return clearInterval(loop);
-                const dets = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
-                const re = faceapi.resizeResults(dets, dim);
-                canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
-                if(faceMatcher && re.length > 0) {
-                    const best = faceMatcher.findBestMatch(re[0].descriptor);
-                    new faceapi.draw.DrawBox(re[0].detection.box, { label: best.toString() }).draw(canvas);
-                    if(best.label !== 'unknown') { clearInterval(loop); handleMatch(best.label, video); }
+        const ph = document.getElementById('camera-placeholder');
+
+        if(!isCameraActive) {
+            // Start
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                ph.classList.add('hidden');
+                btn.innerText = 'หยุดสแกน';
+                btn.classList.replace('bg-blue-600','bg-red-600');
+                isCameraActive = true;
+                startFaceDetection();
+            } catch(e) { Swal.fire('Error', 'ไม่สามารถเปิดกล้องได้', 'error'); }
+        } else {
+            // Stop
+            video.srcObject.getTracks().forEach(t => t.stop());
+            video.classList.add('hidden');
+            ph.classList.remove('hidden');
+            btn.innerText = 'เริ่มสแกน';
+            btn.classList.replace('bg-red-600','bg-blue-600');
+            isCameraActive = false;
+            clearInterval(checkInInterval);
+            document.getElementById('canvas').getContext('2d').clearRect(0,0,1000,1000);
+        }
+    }
+
+    function startFaceDetection() {
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        
+        checkInInterval = setInterval(async () => {
+            if(!isCameraActive || !faceMatcher) return;
+            const displaySize = { width: video.clientWidth, height: video.clientHeight };
+            faceapi.matchDimensions(canvas, displaySize);
+            
+            const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+            const resized = faceapi.resizeResults(detections, displaySize);
+            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+            
+            if(resized.length > 0) {
+                const result = faceMatcher.findBestMatch(resized[0].descriptor);
+                const box = resized[0].detection.box;
+                
+                if(result.label !== 'unknown') {
+                    const student = studentsData.find(s => String(s.id) === result.label);
+                    new faceapi.draw.DrawBox(box, { label: student.name }).draw(canvas);
+                    
+                    // Trigger Check-in (Debounced)
+                    if(!student.lastScan || (Date.now() - student.lastScan > 60000)) { // 1 min delay
+                        student.lastScan = Date.now();
+                        processCheckIn(student);
+                    }
+                } else {
+                     new faceapi.draw.DrawBox(box, { label: 'ไม่รู้จัก' }).draw(canvas);
                 }
-            }, 500);
+            }
+        }, 500);
+    }
+
+    async function processCheckIn(student) {
+        // Get GPS
+        let lat = '', lng = '';
+        if(navigator.geolocation) {
+            try {
+                const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000}));
+                lat = pos.coords.latitude; lng = pos.coords.longitude;
+            } catch(e) { console.log('GPS Fail'); }
+        }
+
+        const res = await callAPI('recordAttendance', { 
+            id: student.id, name: student.name, lat, lng 
+        });
+
+        if(res) {
+            Swal.fire({
+                title: res.type === 'CheckIn' ? 'เข้างานสำเร็จ' : (res.type === 'CheckOut' ? 'ออกงานสำเร็จ' : 'แจ้งเตือน'),
+                text: res.message,
+                icon: res.type === 'AlreadyCheckedOut' ? 'warning' : 'success',
+                timer: 3000, showConfirmButton: false
+            });
+            const log = document.getElementById('scan-log');
+            log.innerHTML = `<div class="p-2 border-b text-xs">${new Date().toLocaleTimeString()} - ${res.message}</div>` + log.innerHTML;
+        }
+    }
+
+    // --- API HELPER ---
+    async function callAPI(action, payload = {}) {
+        try {
+            const res = await fetch(WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action, payload })
+            });
+            const json = await res.json();
+            if(json.status === 'error') throw new Error(json.message);
+            return json.data;
+        } catch(e) {
+            Swal.fire('Error', e.message, 'error');
+            return null;
+        }
+    }
+
+    // --- LOGIN & ADMIN UI ---
+    function openLogin() { document.getElementById('login-modal').classList.remove('hidden'); }
+    function closeLogin() { document.getElementById('login-modal').classList.add('hidden'); }
+    async function doLogin() {
+        const u = document.getElementById('admin-user').value;
+        const p = document.getElementById('admin-pass').value;
+        showLoading(true);
+        const res = await callAPI('login', { username: u, password: p });
+        showLoading(false);
+        if(res) {
+            isAdmin = true;
+            closeLogin();
+            document.getElementById('sidebar').classList.remove('hidden'); // Show Sidebar
+            document.getElementById('sidebar').classList.add('flex');
+            document.getElementById('public-header').classList.add('hidden'); // Hide Public Header
+            document.getElementById('page-scan').classList.add('hidden'); // Hide Scan
+            showPage('dashboard');
+            loadAdminData();
+        }
+    }
+    function logout() { location.reload(); }
+
+    function showPage(pageName) {
+        document.querySelectorAll('.page-section').forEach(el => el.classList.add('hidden'));
+        document.getElementById('page-' + pageName).classList.remove('hidden');
+    }
+
+    async function loadAdminData() {
+        // Load Depts/Levels for selects
+        const depts = await callAPI('getDepartments');
+        const levels = await callAPI('getLevels');
+        updateSelects(depts, levels);
+        
+        if(!document.getElementById('page-dashboard').classList.contains('hidden')) loadDashboard();
+        if(!document.getElementById('page-members').classList.contains('hidden')) loadMembersTable();
+        if(!document.getElementById('page-attendance').classList.contains('hidden')) loadAttendanceTable();
+    }
+
+    function updateSelects(depts, levels) {
+        // Implementation for filling <select> options in Member Modal & Settings
+        const deptOpts = depts.map(d => `<option>${d[0]}</option>`).join('');
+        const levelOpts = levels.map(l => `<option>${l[0]}</option>`).join('');
+        
+        document.getElementById('mem-dept').innerHTML = deptOpts;
+        document.getElementById('mem-level').innerHTML = levelOpts;
+        document.getElementById('att-filter-dept').innerHTML = '<option value="">ทุกสาขา</option>' + deptOpts;
+        document.getElementById('ann-target').innerHTML = '<option value="all">ทั้งหมด</option>' + deptOpts;
+
+        // Settings Lists
+        document.getElementById('list-depts').innerHTML = depts.map((d, i) => `<li class="flex justify-between bg-gray-50 p-2">${d[0]} <button onclick="delSetting('deleteDepartment', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
+        document.getElementById('list-levels').innerHTML = levels.map((l, i) => `<li class="flex justify-between bg-gray-50 p-2">${l[0]} <button onclick="delSetting('deleteLevel', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
+    }
+
+    // --- DASHBOARD ---
+    let chartInstance1, chartInstance2;
+    async function loadDashboard() {
+        const stats = await callAPI('getDashboardData');
+        if(!stats) return;
+
+        document.getElementById('stat-total-users').innerText = stats.totalUsers;
+        document.getElementById('stat-checked-in').innerText = stats.checkedInToday;
+        document.getElementById('stat-late').innerText = stats.lateToday;
+        document.getElementById('stat-absent').innerText = stats.absentToday;
+
+        // Chart 1: Depts
+        const ctx1 = document.getElementById('deptChart').getContext('2d');
+        if(chartInstance1) chartInstance1.destroy();
+        chartInstance1 = new Chart(ctx1, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(stats.deptCounts),
+                datasets: [{ data: Object.values(stats.deptCounts), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'] }]
+            }
+        });
+
+        // Chart 2: Daily
+        const ctx2 = document.getElementById('dailyChart').getContext('2d');
+        if(chartInstance2) chartInstance2.destroy();
+        chartInstance2 = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: ['ปกติ', 'สาย', 'ลา'],
+                datasets: [{ 
+                    label: 'จำนวนคน',
+                    data: [stats.dailyStatus.onTime, stats.dailyStatus.late, stats.dailyStatus.leave], 
+                    backgroundColor: ['#10b981', '#f59e0b', '#6366f1'] 
+                }]
+            }
         });
     }
-    function stopCamera() { if(stream) stream.getTracks().forEach(t=>t.stop()); stream=null; document.getElementById('cam-placeholder').classList.remove('hidden'); document.getElementById('btn-start').classList.remove('hidden'); document.getElementById('btn-stop').classList.add('hidden'); }
+
+    // --- MEMBER MANAGEMENT ---
+    async function loadMembersTable() {
+        const data = await callAPI('getUsers');
+        const tbody = document.getElementById('members-table-body');
+        tbody.innerHTML = '';
+        data.forEach((row, i) => {
+            tbody.innerHTML += `
+                <tr class="border-b hover:bg-gray-50">
+                    <td class="p-3"><img src="${row[6] || 'https://placehold.co/50'}" class="w-10 h-10 rounded-full object-cover"></td>
+                    <td class="p-3">${row[0]}</td>
+                    <td class="p-3">${row[1]}</td>
+                    <td class="p-3">${row[3]}</td>
+                    <td class="p-3 text-xs text-gray-500">${row[4] || '-'}</td>
+                    <td class="p-3">
+                        <button onclick='editMember(${JSON.stringify(row).replace(/'/g,"&#39;")}, ${i+2})' class="text-blue-600 text-sm mr-2">แก้ไข</button>
+                        <button onclick="deleteMember(${i+2})" class="text-red-600 text-sm">ลบ</button>
+                    </td>
+                </tr>`;
+        });
+    }
+
+    function openMemberModal() {
+        document.getElementById('member-form').reset();
+        document.getElementById('mem-row-index').value = '';
+        document.getElementById('member-modal-title').innerText = 'เพิ่มสมาชิก';
+        document.getElementById('member-modal').classList.remove('hidden');
+    }
     
-    async function handleMatch(id, video) {
-        const canvas = document.createElement('canvas');
-        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const img = canvas.toDataURL('image/jpeg');
-        stopCamera();
-        showLoading(true, "กำลังบันทึกเวลา...");
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const res = await apiCall('processCheckIn', { studentId: id, lat: pos.coords.latitude, lng: pos.coords.longitude, image: img });
-            showLoading(false);
-            Swal.fire(res.success?'สำเร็จ':'ผิดพลาด', res.message, res.success?'success':'error');
-        }, () => { showLoading(false); Swal.fire('Error', 'กรุณาเปิด GPS', 'error'); });
-    }
+    window.editMember = (data, rowIndex) => { // Make global
+        document.getElementById('mem-row-index').value = rowIndex;
+        document.getElementById('mem-id').value = data[0];
+        document.getElementById('mem-name').value = data[1];
+        document.getElementById('mem-level').value = data[2];
+        document.getElementById('mem-dept').value = data[3];
+        document.getElementById('mem-email').value = data[4];
+        document.getElementById('member-modal-title').innerText = 'แก้ไขสมาชิก';
+        document.getElementById('member-modal').classList.remove('hidden');
+    };
 
-    // --- ADMIN UI ---
-    function showPage(id) {
-        document.querySelectorAll('.page-section').forEach(p => p.classList.add('hidden'));
-        document.querySelectorAll('nav a').forEach(a => a.classList.remove('sidebar-active', 'bg-slate-800')); // Clear active
-        document.getElementById('page-'+id).classList.remove('hidden');
-        document.getElementById('nav-'+id).classList.add('sidebar-active'); // Set active
-        if(id === 'dashboard' && isAdmin) loadDashboard();
-        if(id === 'history' && isAdmin) loadHistory();
-    }
+    document.getElementById('member-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        showLoading(true);
+        const file = document.getElementById('mem-img').files[0];
+        let encoding = null, imgBase64 = null;
 
-    function adminLogin() {
-        Swal.fire({ title: 'Admin Login', html: '<input id="swal-p" type="password" class="swal2-input" placeholder="Password">', preConfirm: () => document.getElementById('swal-p').value })
-        .then(r => {
-            if(r.value === '1234') {
-                isAdmin = true;
-                document.getElementById('admin-menu').classList.remove('hidden');
-                document.getElementById('btn-login').classList.add('hidden');
-                document.getElementById('btn-logout').classList.remove('hidden');
-                showPage('dashboard'); // Redirect to dashboard
-            } else if (r.isConfirmed) Swal.fire('Error', 'รหัสผิด', 'error');
-        });
-    }
-    function adminLogout() { isAdmin = false; document.getElementById('admin-menu').classList.add('hidden'); document.getElementById('btn-login').classList.remove('hidden'); document.getElementById('btn-logout').classList.add('hidden'); showPage('home'); }
+        if(file) {
+            try {
+                const img = await faceapi.bufferToImage(file);
+                const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+                if(!detection) throw new Error('ไม่พบใบหน้าในรูป');
+                encoding = JSON.stringify(Array.from(detection.descriptor));
+                
+                // Resize image
+                const cvs = document.createElement('canvas');
+                cvs.width = 150; cvs.height = 150 * (img.height/img.width);
+                cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
+                imgBase64 = cvs.toDataURL('image/jpeg', 0.8);
+            } catch(err) {
+                showLoading(false);
+                return Swal.fire('Error', err.message, 'error');
+            }
+        }
 
-    // --- MANAGE USERS ---
-    function renderUsers() {
-        const tb = document.getElementById('table-users');
-        tb.innerHTML = students.map(s => `
-            <tr class="border-b hover:bg-slate-50 transition">
-                <td class="p-3"><img src="${s.PhotoUrl||'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full object-cover border"></td>
-                <td class="p-3 font-mono text-sm">${s.StudentID}</td>
-                <td class="p-3 font-semibold">${s.Name}</td>
-                <td class="p-3"><span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">${s.Branch}</span></td>
-                <td class="p-3 text-center">
-                    <button onclick="openUserModal('update', '${s.StudentID}')" class="text-blue-500 hover:text-blue-700 mx-1"><i class="fa-solid fa-pen-to-square"></i></button>
-                    <button onclick="delUser('${s.StudentID}')" class="text-red-500 hover:text-red-700 mx-1"><i class="fa-solid fa-trash"></i></button>
-                </td>
+        const payload = {
+            rowIndex: document.getElementById('mem-row-index').value,
+            id: document.getElementById('mem-id').value,
+            name: document.getElementById('mem-name').value,
+            dept: document.getElementById('mem-dept').value,
+            level: document.getElementById('mem-level').value,
+            email: document.getElementById('mem-email').value,
+            faceEncoding: encoding,
+            imageData: imgBase64
+        };
+
+        const action = payload.rowIndex ? 'updateUser' : 'addUser';
+        await callAPI(action, payload);
+        document.getElementById('member-modal').classList.add('hidden');
+        await loadMembersTable();
+        await loadStudentsForFace(); // Reload models
+        showLoading(false);
+        Swal.fire('Success', 'บันทึกเรียบร้อย', 'success');
+    });
+
+    window.deleteMember = async (index) => {
+        if(await Swal.fire({ title: 'ยืนยัน?', showCancelButton: true }).then(r => r.isConfirmed)) {
+            await callAPI('deleteUser', { rowIndex: index });
+            loadMembersTable();
+        }
+    };
+
+    // --- ATTENDANCE TABLE ---
+    async function loadAttendanceTable() {
+        const data = await callAPI('getAttendance');
+        const tbody = document.getElementById('attendance-table-body');
+        tbody.innerHTML = data.map(r => `
+            <tr class="border-b text-sm">
+                <td class="p-2">${new Date(r[2]).toLocaleDateString('th-TH')}</td>
+                <td class="p-2">${r[0]}</td>
+                <td class="p-2">${r[1]}</td>
+                <td class="p-2 text-green-600 font-bold">${new Date(r[2]).toLocaleDateString('th-TH') === r[2] ? r[3] : r[3].substring(0,5)}</td>
+                <td class="p-2">${r[4] ? r[4].substring(0,5) : '-'}</td>
+                <td class="p-2"><span class="px-2 py-1 rounded text-xs text-white ${r[5]==='สาย'?'bg-orange-500':'bg-green-500'}">${r[5]}</span></td>
+                <td class="p-2 font-bold">${r[6] || '-'}</td>
+                <td class="p-2 text-xs text-blue-500 truncate max-w-[100px]">${r[7] ? `<a href="https://maps.google.com/?q=${r[7]},${r[8]}" target="_blank">Map</a>` : '-'}</td>
             </tr>
         `).join('');
     }
 
-    // Modal Handler
-    function openUserModal(mode, id = null) {
-        document.getElementById('modal-user').classList.remove('hidden');
-        document.getElementById('u-mode').value = mode;
-        document.getElementById('form-user').reset();
-        document.getElementById('f-name').innerText = "คลิกเพื่ออัปโหลดรูป";
-        document.getElementById('u-base64').value = "";
-
-        if (mode === 'update' && id) {
-            const s = students.find(x => x.StudentID == id);
-            if (s) {
-                document.getElementById('modal-title').innerText = "แก้ไขข้อมูลนักเรียน";
-                document.getElementById('u-old-id').value = s.StudentID;
-                document.getElementById('u-id').value = s.StudentID;
-                document.getElementById('u-name').value = s.Name;
-                document.getElementById('u-branch').value = s.Branch;
-                document.getElementById('u-email').value = s.Email;
-            }
-        } else {
-            document.getElementById('modal-title').innerText = "เพิ่มนักเรียนใหม่";
-        }
-    }
-
-    document.getElementById('u-file').onchange = e => {
-        const fr = new FileReader();
-        fr.onload = x => { document.getElementById('u-base64').value = x.target.result; document.getElementById('f-name').innerText = "เลือกรูปแล้ว"; };
-        fr.readAsDataURL(e.target.files[0]);
-    };
-
-    document.getElementById('form-user').onsubmit = async (e) => {
-        e.preventDefault();
-        showLoading(true);
-        const mode = document.getElementById('u-mode').value;
-        const data = {
-            OldID: document.getElementById('u-old-id').value,
-            StudentID: document.getElementById('u-id').value,
-            Name: document.getElementById('u-name').value,
-            Branch: document.getElementById('u-branch').value,
-            Email: document.getElementById('u-email').value,
-            PhotoBase64: document.getElementById('u-base64').value
+    // --- ANNOUNCEMENTS ---
+    async function sendAnnouncement() {
+        const payload = {
+            topic: document.getElementById('ann-topic').value,
+            target: document.getElementById('ann-target').value,
+            message: document.getElementById('ann-message').value
         };
-        
-        const res = await apiCall('crudManager', { type: mode, collection: 'students', payload: data });
+        showLoading(true);
+        const res = await callAPI('sendAnnouncement', payload);
         showLoading(false);
-        if(res.success) {
-            document.getElementById('modal-user').classList.add('hidden');
-            Swal.fire('Success', res.message, 'success');
-            // Reload data
-            const refresh = await apiCall('getInitialData');
-            if(refresh.success) { students = refresh.students; renderUsers(); }
-        } else {
-            Swal.fire('Error', res.message, 'error');
+        Swal.fire('แจ้งเตือน', res, 'success');
+    }
+
+    // --- SETTINGS ---
+    async function addSetting(type) {
+        const val = document.getElementById(type === 'Department' ? 'new-dept-name' : 'new-level-name').value;
+        if(!val) return;
+        await callAPI('add' + type, { name: val });
+        loadAdminData(); // Refresh lists
+        document.getElementById(type === 'Department' ? 'new-dept-name' : 'new-level-name').value = '';
+    }
+    window.delSetting = async (action, index) => {
+        await callAPI(action, { rowIndex: index });
+        loadAdminData();
+    };
+
+    // --- STUDENT CHECK STATS ---
+    window.openMyStats = async () => {
+        const { value: sid } = await Swal.fire({ title: 'กรอกรหัสนักศึกษา', input: 'text', showCancelButton: true });
+        if(sid) {
+            showLoading(true);
+            const res = await callAPI('getStudentSummary', { studentId: sid });
+            showLoading(false);
+            if(res) {
+                Swal.fire({
+                    title: `ประวัติ: ${sid}`,
+                    html: `
+                        <div class="text-left">
+                            <p><b>ชั่วโมงรวม:</b> ${res.totalHours} ชม.</p>
+                            <p><b>เข้างานปกติ:</b> ${res.counts.onTime} ครั้ง</p>
+                            <p><b>สาย:</b> ${res.counts.late} ครั้ง</p>
+                        </div>
+                    `
+                });
+            }
         }
     };
 
-    async function delUser(id) {
-        if(!confirm('ยืนยันการลบ?')) return;
-        showLoading(true);
-        const res = await apiCall('crudManager', { type: 'delete', collection: 'students', payload: { id } });
-        showLoading(false);
-        if(res.success) {
-            Swal.fire('Deleted', 'ลบข้อมูลสำเร็จ', 'success');
-            const refresh = await apiCall('getInitialData');
-            if(refresh.success) { students = refresh.students; renderUsers(); }
-        } else Swal.fire('Error', res.message, 'error');
-    }
-
-    // --- DASHBOARD & HISTORY ---
-    async function loadDashboard() {
-        const res = await apiCall('getDashboardStats');
-        if(res.success) {
-            document.getElementById('adm-total').innerText = res.totalStudents;
-            document.getElementById('adm-present').innerText = res.todayCheckIn;
-            document.getElementById('adm-late').innerText = res.todayLate;
-            document.getElementById('adm-absent').innerText = res.todayAbsent;
-            
-            // Chart
-            const ctx = document.getElementById('adminChart').getContext('2d');
-            if(window.myChart) window.myChart.destroy();
-            window.myChart = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['ปกติ', 'สาย', 'ขาด'],
-                    datasets: [{ data: [res.todayCheckIn - res.todayLate, res.todayLate, res.todayAbsent], backgroundColor: ['#22c55e', '#eab308', '#ef4444'] }]
-                }
-            });
-        }
-    }
-
-    async function loadHistory() {
-        const tb = document.getElementById('table-history');
-        tb.innerHTML = '<tr><td colspan="5" class="p-4 text-center">กำลังโหลด...</td></tr>';
-        const res = await apiCall('getHistory', 'all');
-        if(res.success) {
-            tb.innerHTML = res.logs.length ? res.logs.map(l => `
-                <tr class="border-b">
-                    <td class="p-3">${new Date(l.Timestamp).toLocaleString('th-TH')}</td>
-                    <td class="p-3 font-semibold">${l.Name}</td>
-                    <td class="p-3 text-sm">${l.Branch}</td>
-                    <td class="p-3"><span class="${l.Status==='สาย'?'text-yellow-600':'text-green-600'} font-bold">${l.Status}</span></td>
-                    <td class="p-3"><a href="${l.EvidencePhoto}" target="_blank" class="text-blue-500 hover:underline text-xs">ดูรูป</a></td>
-                </tr>`).join('') : '<tr><td colspan="5" class="p-4 text-center">ไม่พบข้อมูล</td></tr>';
-        }
-    }
-
-    // --- NOTIFY ---
-    function populateNotifyBranch(branches) {
-        const sel = document.getElementById('notify-branch');
-        if(sel) {
-            branches.forEach(b => {
-                const opt = document.createElement('option'); opt.value = b.BranchName; opt.innerText = b.BranchName;
-                sel.appendChild(opt);
-            });
-        }
-    }
-
-    function sendNotify() {
-        const branch = document.getElementById('notify-branch').value;
-        const subject = document.getElementById('notify-subject').value;
-        const detail = document.getElementById('notify-msg').value;
-        if(!subject || !detail) return Swal.fire('Error', 'กรอกข้อมูลให้ครบ', 'warning');
-        
-        showLoading(true, "กำลังส่งเมล...");
-        apiCall('sendAnnouncement', { branch, subject, detail }).then(res => {
-            showLoading(false);
-            Swal.fire(res.success?'Success':'Error', res.message, res.success?'success':'error');
-        });
-    }
-
-    function showLoading(show, txt) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; if(txt) document.getElementById('loading-text').innerText = txt; }
-  </script>
+</script>
 </body>
 </html>
