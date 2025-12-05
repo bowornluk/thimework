@@ -162,7 +162,7 @@
                                 <th class="p-3">ออก</th>
                                 <th class="p-3">สถานะ</th>
                                 <th class="p-3">ชม.รวม</th>
-                                <th class="p-3">พิกัด</th>
+                                <th class="p-3">สถานที่</th>
                             </tr>
                         </thead>
                         <tbody id="attendance-table-body"></tbody>
@@ -181,7 +181,7 @@
                         <label class="block mb-1 font-bold">ส่งถึงกลุ่มเป้าหมาย</label>
                         <select id="ann-target" class="w-full border p-2 rounded">
                             <option value="all">นักศึกษาทั้งหมด</option>
-                            </select>
+                        </select>
                     </div>
                     <div class="mb-4">
                         <label class="block mb-1 font-bold">ข้อความรายละเอียด</label>
@@ -261,7 +261,8 @@
     let WEB_APP_URL = localStorage.getItem('webapp_url') || '';
     const MODEL_URL = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
     let faceMatcher = null;
-    let studentsData = [];
+    let studentsData = []; // For Face API
+    let membersCache = []; // For Admin Table (Fixes HTML injection bug)
     let isCameraActive = false;
     let checkInInterval = null;
     let isAdmin = false;
@@ -282,25 +283,33 @@
     // --- FACE API & SCANNING ---
     async function loadModels() {
         showLoading(true);
-        await Promise.all([
-            faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
-            faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-            faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
-        ]);
-        await loadStudentsForFace();
+        try {
+            await Promise.all([
+                faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
+            await loadStudentsForFace();
+        } catch (e) { console.error("Model Error:", e); }
         showLoading(false);
     }
 
     async function loadStudentsForFace() {
         const res = await callAPI('getUsers');
-        if(res) {
+        if(res && Array.isArray(res)) {
             studentsData = res.map(row => ({
                 id: row[0], name: row[1], level: row[2], dept: row[3], email: row[4],
                 faceEncoding: row[5], img: row[6]
             }));
             const labeledDescriptors = studentsData
                 .filter(s => s.faceEncoding)
-                .map(s => new faceapi.LabeledFaceDescriptors(String(s.id), [new Float32Array(JSON.parse(s.faceEncoding))]));
+                .map(s => {
+                    try {
+                        return new faceapi.LabeledFaceDescriptors(String(s.id), [new Float32Array(JSON.parse(s.faceEncoding))]);
+                    } catch(e) { return null; }
+                })
+                .filter(d => d !== null);
+                
             if(labeledDescriptors.length > 0) faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
         }
     }
@@ -313,7 +322,6 @@
         const ph = document.getElementById('camera-placeholder');
 
         if(!isCameraActive) {
-            // Start
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: {} });
                 video.srcObject = stream;
@@ -325,14 +333,13 @@
                 startFaceDetection();
             } catch(e) { Swal.fire('Error', 'ไม่สามารถเปิดกล้องได้', 'error'); }
         } else {
-            // Stop
-            video.srcObject.getTracks().forEach(t => t.stop());
+            if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
             video.classList.add('hidden');
             ph.classList.remove('hidden');
             btn.innerText = 'เริ่มสแกน';
             btn.classList.replace('bg-red-600','bg-blue-600');
             isCameraActive = false;
-            clearInterval(checkInInterval);
+            if(checkInInterval) clearInterval(checkInInterval);
             document.getElementById('canvas').getContext('2d').clearRect(0,0,1000,1000);
         }
     }
@@ -346,32 +353,33 @@
             const displaySize = { width: video.clientWidth, height: video.clientHeight };
             faceapi.matchDimensions(canvas, displaySize);
             
-            const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
-            const resized = faceapi.resizeResults(detections, displaySize);
-            canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-            
-            if(resized.length > 0) {
-                const result = faceMatcher.findBestMatch(resized[0].descriptor);
-                const box = resized[0].detection.box;
+            try {
+                const detections = await faceapi.detectAllFaces(video).withFaceLandmarks().withFaceDescriptors();
+                const resized = faceapi.resizeResults(detections, displaySize);
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
                 
-                if(result.label !== 'unknown') {
-                    const student = studentsData.find(s => String(s.id) === result.label);
-                    new faceapi.draw.DrawBox(box, { label: student.name }).draw(canvas);
+                if(resized.length > 0) {
+                    const result = faceMatcher.findBestMatch(resized[0].descriptor);
+                    const box = resized[0].detection.box;
                     
-                    // Trigger Check-in (Debounced)
-                    if(!student.lastScan || (Date.now() - student.lastScan > 60000)) { // 1 min delay
-                        student.lastScan = Date.now();
-                        processCheckIn(student);
+                    if(result.label !== 'unknown') {
+                        const student = studentsData.find(s => String(s.id) === result.label);
+                        if(student) {
+                            new faceapi.draw.DrawBox(box, { label: student.name }).draw(canvas);
+                            if(!student.lastScan || (Date.now() - student.lastScan > 60000)) { 
+                                student.lastScan = Date.now();
+                                processCheckIn(student);
+                            }
+                        }
+                    } else {
+                         new faceapi.draw.DrawBox(box, { label: 'ไม่รู้จัก' }).draw(canvas);
                     }
-                } else {
-                     new faceapi.draw.DrawBox(box, { label: 'ไม่รู้จัก' }).draw(canvas);
                 }
-            }
+            } catch(e) { console.log(e); }
         }, 500);
     }
 
     async function processCheckIn(student) {
-        // Get GPS
         let lat = '', lng = '';
         if(navigator.geolocation) {
             try {
@@ -407,7 +415,7 @@
             if(json.status === 'error') throw new Error(json.message);
             return json.data;
         } catch(e) {
-            Swal.fire('Error', e.message, 'error');
+            Swal.fire('ข้อผิดพลาด', e.message, 'error');
             return null;
         }
     }
@@ -424,10 +432,10 @@
         if(res) {
             isAdmin = true;
             closeLogin();
-            document.getElementById('sidebar').classList.remove('hidden'); // Show Sidebar
+            document.getElementById('sidebar').classList.remove('hidden');
             document.getElementById('sidebar').classList.add('flex');
-            document.getElementById('public-header').classList.add('hidden'); // Hide Public Header
-            document.getElementById('page-scan').classList.add('hidden'); // Hide Scan
+            document.getElementById('public-header').classList.add('hidden');
+            document.getElementById('page-scan').classList.add('hidden');
             showPage('dashboard');
             loadAdminData();
         }
@@ -440,10 +448,9 @@
     }
 
     async function loadAdminData() {
-        // Load Depts/Levels for selects
         const depts = await callAPI('getDepartments');
         const levels = await callAPI('getLevels');
-        updateSelects(depts, levels);
+        if(depts && levels) updateSelects(depts, levels);
         
         if(!document.getElementById('page-dashboard').classList.contains('hidden')) loadDashboard();
         if(!document.getElementById('page-members').classList.contains('hidden')) loadMembersTable();
@@ -451,7 +458,6 @@
     }
 
     function updateSelects(depts, levels) {
-        // Implementation for filling <select> options in Member Modal & Settings
         const deptOpts = depts.map(d => `<option>${d[0]}</option>`).join('');
         const levelOpts = levels.map(l => `<option>${l[0]}</option>`).join('');
         
@@ -460,7 +466,6 @@
         document.getElementById('att-filter-dept').innerHTML = '<option value="">ทุกสาขา</option>' + deptOpts;
         document.getElementById('ann-target').innerHTML = '<option value="all">ทั้งหมด</option>' + deptOpts;
 
-        // Settings Lists
         document.getElementById('list-depts').innerHTML = depts.map((d, i) => `<li class="flex justify-between bg-gray-50 p-2">${d[0]} <button onclick="delSetting('deleteDepartment', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
         document.getElementById('list-levels').innerHTML = levels.map((l, i) => `<li class="flex justify-between bg-gray-50 p-2">${l[0]} <button onclick="delSetting('deleteLevel', ${i+2})" class="text-red-500">ลบ</button></li>`).join('');
     }
@@ -476,7 +481,6 @@
         document.getElementById('stat-late').innerText = stats.lateToday;
         document.getElementById('stat-absent').innerText = stats.absentToday;
 
-        // Chart 1: Depts
         const ctx1 = document.getElementById('deptChart').getContext('2d');
         if(chartInstance1) chartInstance1.destroy();
         chartInstance1 = new Chart(ctx1, {
@@ -487,7 +491,6 @@
             }
         });
 
-        // Chart 2: Daily
         const ctx2 = document.getElementById('dailyChart').getContext('2d');
         if(chartInstance2) chartInstance2.destroy();
         chartInstance2 = new Chart(ctx2, {
@@ -503,11 +506,19 @@
         });
     }
 
-    // --- MEMBER MANAGEMENT ---
+    // --- MEMBER MANAGEMENT (FIXED) ---
     async function loadMembersTable() {
         const data = await callAPI('getUsers');
         const tbody = document.getElementById('members-table-body');
         tbody.innerHTML = '';
+        
+        if(!data || !Array.isArray(data)) {
+             tbody.innerHTML = '<tr><td colspan="6" class="text-center p-4">ไม่พบข้อมูล หรือเกิดข้อผิดพลาด</td></tr>';
+             return;
+        }
+
+        membersCache = data; // Cache data to avoid HTML injection issues
+
         data.forEach((row, i) => {
             tbody.innerHTML += `
                 <tr class="border-b hover:bg-gray-50">
@@ -517,21 +528,17 @@
                     <td class="p-3">${row[3]}</td>
                     <td class="p-3 text-xs text-gray-500">${row[4] || '-'}</td>
                     <td class="p-3">
-                        <button onclick='editMember(${JSON.stringify(row).replace(/'/g,"&#39;")}, ${i+2})' class="text-blue-600 text-sm mr-2">แก้ไข</button>
+                        <button onclick="prepareEditMember(${i})" class="text-blue-600 text-sm mr-2">แก้ไข</button>
                         <button onclick="deleteMember(${i+2})" class="text-red-600 text-sm">ลบ</button>
                     </td>
                 </tr>`;
         });
     }
 
-    function openMemberModal() {
-        document.getElementById('member-form').reset();
-        document.getElementById('mem-row-index').value = '';
-        document.getElementById('member-modal-title').innerText = 'เพิ่มสมาชิก';
-        document.getElementById('member-modal').classList.remove('hidden');
-    }
-    
-    window.editMember = (data, rowIndex) => { // Make global
+    window.prepareEditMember = (index) => {
+        const data = membersCache[index];
+        const rowIndex = index + 2;
+        
         document.getElementById('mem-row-index').value = rowIndex;
         document.getElementById('mem-id').value = data[0];
         document.getElementById('mem-name').value = data[1];
@@ -540,7 +547,14 @@
         document.getElementById('mem-email').value = data[4];
         document.getElementById('member-modal-title').innerText = 'แก้ไขสมาชิก';
         document.getElementById('member-modal').classList.remove('hidden');
-    };
+    }
+
+    function openMemberModal() {
+        document.getElementById('member-form').reset();
+        document.getElementById('mem-row-index').value = '';
+        document.getElementById('member-modal-title').innerText = 'เพิ่มสมาชิก';
+        document.getElementById('member-modal').classList.remove('hidden');
+    }
 
     document.getElementById('member-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -555,7 +569,6 @@
                 if(!detection) throw new Error('ไม่พบใบหน้าในรูป');
                 encoding = JSON.stringify(Array.from(detection.descriptor));
                 
-                // Resize image
                 const cvs = document.createElement('canvas');
                 cvs.width = 150; cvs.height = 150 * (img.height/img.width);
                 cvs.getContext('2d').drawImage(img, 0, 0, cvs.width, cvs.height);
@@ -581,43 +594,49 @@
         await callAPI(action, payload);
         document.getElementById('member-modal').classList.add('hidden');
         await loadMembersTable();
-        await loadStudentsForFace(); // Reload models
+        await loadStudentsForFace(); 
         showLoading(false);
         Swal.fire('Success', 'บันทึกเรียบร้อย', 'success');
     });
 
     window.deleteMember = async (index) => {
-        if(await Swal.fire({ title: 'ยืนยัน?', showCancelButton: true }).then(r => r.isConfirmed)) {
+        if(await Swal.fire({ title: 'ยืนยันการลบ?', showCancelButton: true }).then(r => r.isConfirmed)) {
+            showLoading(true);
             await callAPI('deleteUser', { rowIndex: index });
-            loadMembersTable();
+            await loadMembersTable();
+            showLoading(false);
         }
     };
 
     // --- ATTENDANCE TABLE ---
     async function loadAttendanceTable() {
-    const data = await callAPI('getAttendance');
-    const tbody = document.getElementById('attendance-table-body');
-    
-    tbody.innerHTML = data.map(r => `
-        <tr class="border-b text-sm hover:bg-gray-50">
-            <td class="p-2">${new Date(r[2]).toLocaleDateString('th-TH')}</td>
-            <td class="p-2">${r[0]}</td>
-            <td class="p-2">${r[1]}</td>
-            <td class="p-2 text-green-600 font-bold">${r[3] ? String(r[3]).substring(0,5) : '-'}</td>
-            <td class="p-2 text-red-600 font-bold">${r[4] ? String(r[4]).substring(0,5) : '-'}</td>
-            <td class="p-2">
-                <span class="px-2 py-1 rounded text-xs text-white ${r[5]==='สาย'?'bg-orange-500':'bg-green-500'}">
-                    ${r[5]}
-                </span>
-            </td>
-            <td class="p-2 font-bold">${r[6] || '-'}</td>
-            
-            <td class="p-2 text-xs text-gray-600 truncate max-w-[200px]" title="${r[7]}">
-                ${r[7] || '-'}
-            </td>
-        </tr>
-    `).join('');
-}
+        const data = await callAPI('getAttendance');
+        const tbody = document.getElementById('attendance-table-body');
+        
+        if (!data || !Array.isArray(data)) {
+             tbody.innerHTML = '<tr><td colspan="8" class="text-center p-4">ไม่มีข้อมูล</td></tr>';
+             return;
+        }
+
+        tbody.innerHTML = data.map(r => `
+            <tr class="border-b text-sm hover:bg-gray-50">
+                <td class="p-2">${new Date(r[2]).toLocaleDateString('th-TH')}</td>
+                <td class="p-2">${r[0]}</td>
+                <td class="p-2">${r[1]}</td>
+                <td class="p-2 text-green-600 font-bold">${r[3] ? String(r[3]).substring(0,5) : '-'}</td>
+                <td class="p-2 text-red-600 font-bold">${r[4] ? String(r[4]).substring(0,5) : '-'}</td>
+                <td class="p-2">
+                    <span class="px-2 py-1 rounded text-xs text-white ${r[5]==='สาย'?'bg-orange-500':'bg-green-500'}">
+                        ${r[5]}
+                    </span>
+                </td>
+                <td class="p-2 font-bold">${r[6] || '-'}</td>
+                <td class="p-2 text-xs text-gray-600 truncate max-w-[200px]" title="${r[7]}">
+                    ${r[7] || '-'}
+                </td>
+            </tr>
+        `).join('');
+    }
 
     // --- ANNOUNCEMENTS ---
     async function sendAnnouncement() {
@@ -636,13 +655,19 @@
     async function addSetting(type) {
         const val = document.getElementById(type === 'Department' ? 'new-dept-name' : 'new-level-name').value;
         if(!val) return;
+        showLoading(true);
         await callAPI('add' + type, { name: val });
-        loadAdminData(); // Refresh lists
+        await loadAdminData(); 
         document.getElementById(type === 'Department' ? 'new-dept-name' : 'new-level-name').value = '';
+        showLoading(false);
     }
     window.delSetting = async (action, index) => {
-        await callAPI(action, { rowIndex: index });
-        loadAdminData();
+        if(await Swal.fire({ title: 'ยืนยันการลบ?', showCancelButton: true }).then(r => r.isConfirmed)) {
+            showLoading(true);
+            await callAPI(action, { rowIndex: index });
+            await loadAdminData();
+            showLoading(false);
+        }
     };
 
     // --- STUDENT CHECK STATS ---
@@ -663,10 +688,11 @@
                         </div>
                     `
                 });
+            } else {
+                 Swal.fire('ไม่พบข้อมูล', 'ไม่พบรหัสนักศึกษานี้ในระบบ', 'error');
             }
         }
     };
-
 </script>
 </body>
 </html>
